@@ -116,7 +116,7 @@ func (d *DAG) AddEdge(srcName string, dstName string) error {
 		d.inboundEdge[dstId] = newSet
 		inbound = newSet
 	}
-	inbound[dstId] = true
+	inbound[srcId] = true
 
 	d.muEdges.Unlock()
 	return nil
@@ -208,6 +208,26 @@ func (d *DAG) Children(name string) ([]*Vertex, error) {
 		return children, nil
 	}
 	return nil, nil
+}
+
+func (d *DAG) ancestors(id id) []*Vertex {
+	var ancestors []*Vertex
+	if parents, ok := d.inboundEdge[id]; ok {
+		for parent := range parents {
+			ancestors = append(ancestors, d.ancestors(parent)...)
+			ancestors = append(ancestors, d.vertices[parent])
+		}
+	}
+	return ancestors
+}
+
+// Return all ancestors for the vertex with the given name.
+func (d *DAG) Ancestors(name string) ([]*Vertex, error) {
+	id, exists := d.name2id[name]
+	if !exists {
+		return nil, errors.New(fmt.Sprintf("name %s does not exist", name))
+	}
+	return d.ancestors(id), nil
 }
 
 func (d *DAG) String() string {
