@@ -3,29 +3,14 @@ package dag
 import (
 	"errors"
 	"fmt"
-	"github.com/google/uuid"
 	"sync"
 )
 
-type id = uuid.UUID
+type id = uint64
 type idSet = map[id]bool
 
 type Vertex interface {
 	String() string
-}
-
-var space *id = nil
-
-func getSpace() id {
-	if space == nil {
-		random, _ := uuid.NewRandom()
-		space = &random
-	}
-	return *space
-}
-
-func idFormName(name string) id {
-	return uuid.NewMD5(getSpace(), []byte(name))
 }
 
 // DAG type implements a Directed Acyclic Graph data structure.
@@ -37,6 +22,8 @@ type DAG struct {
 	inboundEdge  map[id]idSet
 	outboundEdge map[id]idSet
 	muEdges      sync.Mutex
+	lastId       id
+	freeIds      []id
 }
 
 // Creates a new Directed Acyclic Graph or DAG.
@@ -47,8 +34,28 @@ func NewDAG() *DAG {
 		outboundEdge: make(map[id]idSet),
 		name2id:      make(map[string]id),
 		id2name:      make(map[id]string),
+		lastId:		  0,
+		freeIds:      []id{},
 	}
 	return d
+}
+
+// Get a new id (either a recycled or a new one).
+func (d *DAG) newID() id {
+	count := len(d.freeIds)
+	if count == 0 {
+		d.lastId += 1
+		return d.lastId
+	}
+	n := count-1
+	id := d.freeIds[n]
+	d.freeIds = d.freeIds[:n]
+	return id
+}
+
+// Return an id.
+func (d *DAG) returnID(id id ) {
+	d.freeIds = append(d.freeIds, id)
 }
 
 // Add a vertex.
@@ -57,13 +64,15 @@ func (d *DAG) AddVertex(name string, v *Vertex) error {
 		return errors.New(fmt.Sprintf("duplicate entry for name %s", name))
 	}
 	d.muVertices.Lock()
-	id := idFormName(name)
+	id := d.newID()
 	d.name2id[name] = id
 	d.id2name[id] = name
 	d.vertices[id] = v
 	d.muVertices.Unlock()
 	return nil
 }
+
+
 
 // Delete a vertex including all inbound and outbound edges.
 func (d *DAG) DeleteVertex(name string) {
@@ -76,6 +85,7 @@ func (d *DAG) DeleteVertex(name string) {
 		delete(d.vertices, id)
 		delete(d.id2name, id)
 		delete(d.name2id, name)
+		d.returnID(id)
 		d.muVertices.Unlock()
 	}
 }
