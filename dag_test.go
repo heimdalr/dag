@@ -14,26 +14,27 @@ func (v testVertex) String() string {
 
 func TestDAG(t *testing.T) {
 	dag := NewDAG()
-	if dag.Order() != 0 {
-		t.Fatalf("DAG number of vertices expected to be 0 but got %dag", dag.Order())
+	if dag.GetOrder() != 0 {
+		t.Fatalf("DAG number of vertices expected to be 0 but got %dag", dag.GetOrder())
 	}
 }
 
 func Test_AddVertex(t *testing.T) {
 	dag := NewDAG()
 	var v Vertex = testVertex{"1"}
-	err := dag.AddVertex("1", &v)
+	err := dag.AddVertex(&v)
 	if err != nil {
 		t.Fatalf("Can't add vertex to DAG: %s", err)
 	}
-	if dag.Order() != 1 {
-		t.Fatalf("DAG number of vertices expected to be 1 but got %d", dag.Order())
+	if dag.GetOrder() != 1 {
+		t.Fatalf("DAG number of vertices expected to be 1 but got %d", dag.GetOrder())
 	}
-	err2 := dag.AddVertex("1", &v)
+	err2 := dag.AddVertex(&v)
 	if err2 == nil {
 		t.Fatal("Expected to see a duplicate entry error")
 	}
-	err3 := dag.AddVertex("2", &v)
+	var v2 Vertex = testVertex{"2"}
+	err3 := dag.AddVertex(&v2)
 	if err3 != nil {
 		t.Fatal("Did not expect to see a duplicate entry error")
 	}
@@ -43,24 +44,21 @@ func Test_AddVertex(t *testing.T) {
 func Test_DeleteVertex(t *testing.T) {
 	dag := NewDAG()
 	var v Vertex = testVertex{"1"}
-	_ = dag.AddVertex("1", &v)
-	dag.DeleteVertex("1")
-	if dag.Order() != 0 {
-		t.Fatalf("DAG number of vertices expected to be 0 but got %d", dag.Order())
+	_ = dag.AddVertex(&v)
+	dag.DeleteVertex(&v)
+	if dag.GetOrder() != 0 {
+		t.Fatalf("DAG number of vertices expected to be 0 but got %d", dag.GetOrder())
 	}
-	dag.DeleteVertex("1")
+	dag.DeleteVertex(&v)
 }
 
 func Test_AddEdge(t *testing.T) {
 	dag := NewDAG()
-	var v Vertex = testVertex{"1"}
-	_ = dag.AddVertex("1", &v)
-	errEdge1 := dag.AddEdge("1", "2")
-	if errEdge1 == nil {
-		t.Fatal("Expected to see a missing vertex error")
-	}
-	_ = dag.AddVertex("2", &v)
-	errEdge2 := dag.AddEdge("1", "2")
+	var v1 Vertex = testVertex{"1"}
+	var v2 Vertex = testVertex{"2"}
+	_ = dag.AddVertex(&v1)
+	_ = dag.AddVertex(&v2)
+	errEdge2 := dag.AddEdge(&v1, &v2)
 	if errEdge2 != nil {
 		t.Fatalf("Can't add edge to DAG: %s", errEdge2)
 	}
@@ -72,19 +70,19 @@ func Test_Ancestors(t *testing.T) {
 	var v2 Vertex = testVertex{"2"}
 	var v3 Vertex = testVertex{"3"}
 	var v4 Vertex = testVertex{"4"}
-	_ = dag.AddVertex("1", &v1)
-	_ = dag.AddVertex("2", &v2)
-	_ = dag.AddVertex("3", &v3)
-	_ = dag.AddVertex("4", &v4)
-	_ = dag.AddEdge("1", "2")
-	_ = dag.AddEdge("2", "3")
-	_ = dag.AddEdge("2", "4")
+	_ = dag.AddVertex(&v1)
+	_ = dag.AddVertex(&v2)
+	_ = dag.AddVertex(&v3)
+	_ = dag.AddVertex(&v4)
+	_ = dag.AddEdge(&v1, &v2)
+	_ = dag.AddEdge(&v2, &v3)
+	_ = dag.AddEdge(&v2, &v4)
 	//fmt.Print(dag)
-	ancestors, err := dag.Ancestors("4")
+	ancestors, err := dag.GetAncestors(&v4)
 	if err != nil {
 		t.Fatalf("Unexpected error: %s", err)
 	}
 	if len(ancestors) != 2 {
-		t.Fatalf("DAG number of ancestors expected to be 2 but got %d", len(ancestors))
+		t.Fatalf("DAG number of getAncestorsAux expected to be 2 but got %d", len(ancestors))
 	}
 }
