@@ -170,6 +170,18 @@ func (d *DAG) GetRoots() []*Vertex {
 	return roots
 }
 
+// Return all vertices.
+func (d *DAG) GetVertices() []*Vertex {
+	length := len(d.vertices)
+	vertices := make([]*Vertex, length)
+	i := 0
+	for v := range d.vertices {
+		vertices[i] = v
+		i += 1
+	}
+	return vertices
+}
+
 // Return all children of the given vertex.
 func (d *DAG) GetChildren(v *Vertex) ([]*Vertex, error) {
 	if _, ok := d.vertices[v]; !ok {
@@ -177,8 +189,10 @@ func (d *DAG) GetChildren(v *Vertex) ([]*Vertex, error) {
 	}
 	if children, ok := d.outboundEdge[v]; ok {
 		result := make([]*Vertex, len(children))
+		i := 0
 		for child := range children {
-			result = append(result, child)
+			result[i] = child
+			i += 1
 		}
 		return result, nil
 	}
@@ -192,8 +206,10 @@ func (d *DAG) GetParents(v *Vertex) ([]*Vertex, error) {
 	}
 	if parents, ok := d.inboundEdge[v]; ok {
 		result := make([]*Vertex, len(parents))
+		i := 0
 		for parent := range parents {
-			result = append(result, parent)
+			result[i] = parent
+			i += 1
 		}
 		return result, nil
 	}

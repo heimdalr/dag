@@ -12,55 +12,99 @@ func (v testVertex) String() string {
 	return v.Label
 }
 
-func TestDAG(t *testing.T) {
+func makeVertex(label string) *Vertex {
+	var v Vertex = testVertex{label}
+	return &v
+}
+
+func TestNewDAG(t *testing.T) {
 	dag := NewDAG()
-	if dag.GetOrder() != 0 {
-		t.Fatalf("DAG number of vertices expected to be 0 but got %dag", dag.GetOrder())
+	if order := dag.GetOrder(); order != 0 {
+		t.Errorf("GetOrder() = %d, want 0", order)
+	}
+	if size := dag.GetSize(); size != 0 {
+		t.Errorf("GetSize() = %d, want 0", size)
 	}
 }
 
-func Test_AddVertex(t *testing.T) {
+func TestAddVertex(t *testing.T) {
 	dag := NewDAG()
-	var v Vertex = testVertex{"1"}
-	err := dag.AddVertex(&v)
+	v := makeVertex("1")
+	err := dag.AddVertex(v)
 	if err != nil {
-		t.Fatalf("Can't add vertex to DAG: %s", err)
+		t.Error(err)
 	}
-	if dag.GetOrder() != 1 {
-		t.Fatalf("DAG number of vertices expected to be 1 but got %d", dag.GetOrder())
+	if order := dag.GetOrder(); order != 1 {
+		t.Errorf("GetOrder() = %d, want 1", order)
 	}
-	err2 := dag.AddVertex(&v)
-	if err2 == nil {
-		t.Fatal("Expected to see a duplicate entry error")
+	if size := dag.GetSize(); size != 0 {
+		t.Errorf("GetSize() = %d, want 0", size)
 	}
-	var v2 Vertex = testVertex{"2"}
-	err3 := dag.AddVertex(&v2)
-	if err3 != nil {
-		t.Fatal("Did not expect to see a duplicate entry error")
+	if leafs := len(dag.GetLeafs()); leafs != 1 {
+		t.Errorf("GetLeafs() = %d, want 1", leafs)
 	}
-
+	if roots := len(dag.GetRoots()); roots != 1 {
+		t.Errorf("GetLeafs() = %d, want 1", roots)
+	}
+	if vertices := len(dag.GetVertices()); vertices != 1 {
+		t.Errorf("GetVertices() = %d, want 1", vertices)
+	}
+	if ptr := dag.GetVertices()[0]; ptr != v {
+		t.Errorf("GetVertices()[0] = %p, want %p", ptr, &v)
+	}
 }
 
-func Test_DeleteVertex(t *testing.T) {
+func TestDeleteVertex(t *testing.T) {
 	dag := NewDAG()
-	var v Vertex = testVertex{"1"}
-	_ = dag.AddVertex(&v)
-	dag.DeleteVertex(&v)
-	if dag.GetOrder() != 0 {
-		t.Fatalf("DAG number of vertices expected to be 0 but got %d", dag.GetOrder())
+	v := makeVertex("1")
+	_ = dag.AddVertex(v)
+	dag.DeleteVertex(v)
+	if order := dag.GetOrder(); order != 0 {
+		t.Errorf("GetOrder() = %d, want 0", order)
 	}
-	dag.DeleteVertex(&v)
+	if size := dag.GetSize(); size != 0 {
+		t.Errorf("GetSize() = %d, want 0", size)
+	}
+	if leafs := len(dag.GetLeafs()); leafs != 0 {
+		t.Errorf("GetLeafs() = %d, want 0", leafs)
+	}
+	if roots := len(dag.GetRoots()); roots != 0 {
+		t.Errorf("GetLeafs() = %d, want 0", roots)
+	}
+	if vertices := len(dag.GetVertices()); vertices != 0 {
+		t.Errorf("GetVertices() = %d, want 0", vertices)
+	}
 }
 
-func Test_AddEdge(t *testing.T) {
+func TestAddEdge(t *testing.T) {
 	dag := NewDAG()
-	var v1 Vertex = testVertex{"1"}
-	var v2 Vertex = testVertex{"2"}
-	_ = dag.AddVertex(&v1)
-	_ = dag.AddVertex(&v2)
-	errEdge2 := dag.AddEdge(&v1, &v2)
-	if errEdge2 != nil {
-		t.Fatalf("Can't add edge to DAG: %s", errEdge2)
+	src := makeVertex("src")
+	dst := makeVertex("dst")
+	_ = dag.AddVertex(src)
+	_ = dag.AddVertex(dst)
+	err := dag.AddEdge(src, dst)
+	if err != nil {
+		t.Error(err)
+	}
+	children, errChildren := dag.GetChildren(src)
+	if errChildren != nil {
+		t.Error(errChildren)
+	}
+	if length := len(children); length != 1 {
+		t.Errorf("GetChildren() = %d, want 1", length)
+	}
+	parents, errParents := dag.GetParents(dst)
+	if errParents != nil {
+		t.Error(errParents)
+	}
+	if length := len(parents); length != 1 {
+		t.Errorf("GetParents() = %d, want 1", length)
+	}
+	if leafs := len(dag.GetLeafs()); leafs != 1 {
+		t.Errorf("GetLeafs() = %d, want 1", leafs)
+	}
+	if roots := len(dag.GetRoots()); roots != 1 {
+		t.Errorf("GetLeafs() = %d, want 1", roots)
 	}
 }
 
@@ -86,3 +130,4 @@ func Test_Ancestors(t *testing.T) {
 		t.Fatalf("DAG number of getAncestorsAux expected to be 2 but got %d", len(ancestors))
 	}
 }
+
