@@ -158,6 +158,18 @@ func (d *DAG) GetLeafs() []*Vertex {
 	return leafs
 }
 
+// Return all vertices without parents.
+func (d *DAG) GetRoots() []*Vertex {
+	var roots []*Vertex
+	for v := range d.vertices {
+		srcIds, ok := d.inboundEdge[v]
+		if !ok || len(srcIds) == 0 {
+			roots = append(roots, v)
+		}
+	}
+	return roots
+}
+
 // Return all children of the given vertex.
 func (d *DAG) GetChildren(v *Vertex) ([]*Vertex, error) {
 	if _, ok := d.vertices[v]; !ok {
@@ -205,6 +217,25 @@ func (d *DAG) GetAncestors(v *Vertex) ([]*Vertex, error) {
 		return nil, errors.New(fmt.Sprintf("%s is unknown", (*v).String()))
 	}
 	return d.getAncestorsAux(v), nil
+}
+
+func (d *DAG) getDescendantsAux(v *Vertex) []*Vertex {
+	var descendants []*Vertex
+	if children, ok := d.outboundEdge[v]; ok {
+		for child := range children {
+			descendants = append(descendants, d.getDescendantsAux(child)...)
+			descendants = append(descendants, child)
+		}
+	}
+	return descendants
+}
+
+// Return all Ancestors of the given vertex.
+func (d *DAG) GetDescendants(v *Vertex) ([]*Vertex, error) {
+	if _, ok := d.vertices[v]; !ok {
+		return nil, errors.New(fmt.Sprintf("%s is unknown", (*v).String()))
+	}
+	return d.getDescendantsAux(v), nil
 }
 
 func (d *DAG) String() string {
