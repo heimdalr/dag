@@ -59,8 +59,7 @@ func (d *DAG) DeleteVertex(v *Vertex) {
 	}
 }
 
-// Add an edge (prevents circles).
-func (d *DAG) AddEdge(src *Vertex, dst *Vertex) error {
+func (d *DAG) addEdgeAux(src *Vertex, dst *Vertex, check bool) error {
 	if src == nil || dst == nil {
 		return nil
 	}
@@ -70,6 +69,20 @@ func (d *DAG) AddEdge(src *Vertex, dst *Vertex) error {
 	d.vertices[src] = true
 	d.vertices[dst] = true
 	d.muVertices.Unlock()
+
+	// check for circles, iff desired
+	if check {
+		if src == dst {
+			return errors.New("src and dst are euqal")
+		}
+		descendants, errDesc := d.GetDescendants(dst)
+		if errDesc != nil {
+			return errDesc
+		}
+		if descendants[src] {
+			return errors.New("circle detected")
+		}
+	}
 
 	// test / compute edge nodes
 	outbound, outboundExists := d.outboundEdge[src]
@@ -95,6 +108,17 @@ func (d *DAG) AddEdge(src *Vertex, dst *Vertex) error {
 
 	d.muEdges.Unlock()
 	return nil
+}
+
+// Add an edge prevents circles
+func (d *DAG) AddEdgeSafe(src *Vertex, dst *Vertex) error {
+	return d.addEdgeAux(src, dst, true)
+}
+
+// Add an edge without checking for circles.
+func (d *DAG) AddEdge(src *Vertex, dst *Vertex) error {
+	return d.addEdgeAux(src, dst, false)
+
 }
 
 // Delete an edge.

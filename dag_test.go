@@ -1,6 +1,7 @@
 package dag
 
 import (
+	"fmt"
 	"testing"
 )
 
@@ -77,8 +78,6 @@ func TestAddEdge(t *testing.T) {
 	dag := NewDAG()
 	src := makeVertex("src")
 	dst := makeVertex("dst")
-	dag.AddVertex(src)
-	dag.AddVertex(dst)
 	err := dag.AddEdge(src, dst)
 	if err != nil {
 		t.Error(err)
@@ -103,6 +102,25 @@ func TestAddEdge(t *testing.T) {
 	if roots := len(dag.GetRoots()); roots != 1 {
 		t.Errorf("GetLeafs() = %d, want 1", roots)
 	}
+	if err := dag.AddEdge(src, src); err != nil {
+		t.Errorf("AddEdge(x, x) expected to not return an error")
+	}
+}
+
+func TestAddEdgeSafe(t *testing.T) {
+	dag := NewDAG()
+	src := makeVertex("src")
+	dst := makeVertex("dst")
+	if err := dag.AddEdgeSafe(src, src); err == nil {
+		t.Errorf("AddEdge(x, x) expected to return an error")
+	}
+	if err := dag.AddEdgeSafe(src, dst); err != nil {
+		t.Errorf("AddEdge(x, y) unexpected error: %v", err)
+	}
+	if err := dag.AddEdgeSafe(dst, src); err != nil {
+		t.Errorf("AddEdge(x, y) unexpected error: %v", err)
+	}
+	fmt.Printf("%v", dag.AddEdgeSafe(src, src))
 }
 
 func Test_Ancestors(t *testing.T) {
