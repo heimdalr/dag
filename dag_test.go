@@ -30,10 +30,7 @@ func TestNewDAG(t *testing.T) {
 func TestAddVertex(t *testing.T) {
 	dag := NewDAG()
 	v := makeVertex("1")
-	err := dag.AddVertex(v)
-	if err != nil {
-		t.Error(err)
-	}
+	dag.AddVertex(v)
 	if order := dag.GetOrder(); order != 1 {
 		t.Errorf("GetOrder() = %d, want 1", order)
 	}
@@ -49,15 +46,15 @@ func TestAddVertex(t *testing.T) {
 	if vertices := len(dag.GetVertices()); vertices != 1 {
 		t.Errorf("GetVertices() = %d, want 1", vertices)
 	}
-	if ptr := dag.GetVertices()[0]; ptr != v {
-		t.Errorf("GetVertices()[0] = %p, want %p", ptr, &v)
+	if !dag.GetVertices()[v] {
+		t.Errorf("GetVertices()[v] = %t, want true", dag.GetVertices()[v])
 	}
 }
 
 func TestDeleteVertex(t *testing.T) {
 	dag := NewDAG()
 	v := makeVertex("1")
-	_ = dag.AddVertex(v)
+	dag.AddVertex(v)
 	dag.DeleteVertex(v)
 	if order := dag.GetOrder(); order != 0 {
 		t.Errorf("GetOrder() = %d, want 0", order)
@@ -80,8 +77,8 @@ func TestAddEdge(t *testing.T) {
 	dag := NewDAG()
 	src := makeVertex("src")
 	dst := makeVertex("dst")
-	_ = dag.AddVertex(src)
-	_ = dag.AddVertex(dst)
+	dag.AddVertex(src)
+	dag.AddVertex(dst)
 	err := dag.AddEdge(src, dst)
 	if err != nil {
 		t.Error(err)
@@ -114,10 +111,6 @@ func Test_Ancestors(t *testing.T) {
 	var v2 Vertex = testVertex{"2"}
 	var v3 Vertex = testVertex{"3"}
 	var v4 Vertex = testVertex{"4"}
-	_ = dag.AddVertex(&v1)
-	_ = dag.AddVertex(&v2)
-	_ = dag.AddVertex(&v3)
-	_ = dag.AddVertex(&v4)
 	_ = dag.AddEdge(&v1, &v2)
 	_ = dag.AddEdge(&v2, &v3)
 	_ = dag.AddEdge(&v2, &v4)
@@ -130,4 +123,3 @@ func Test_Ancestors(t *testing.T) {
 		t.Fatalf("DAG number of getAncestorsAux expected to be 2 but got %d", len(ancestors))
 	}
 }
-

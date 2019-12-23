@@ -33,18 +33,21 @@ func NewDAG() *DAG {
 }
 
 // Add a vertex.
-func (d *DAG) AddVertex(v *Vertex) error {
-	if _, ok := d.vertices[v]; ok {
-		return errors.New(fmt.Sprintf("duplicate %s", (*v).String()))
+// For vertices that are part of an edge use AddEdge() instead.
+func (d *DAG) AddVertex(v *Vertex) {
+	if v == nil {
+		return
 	}
 	d.muVertices.Lock()
 	d.vertices[v] = true
 	d.muVertices.Unlock()
-	return nil
 }
 
 // Delete a vertex including all inbound and outbound edges.
 func (d *DAG) DeleteVertex(v *Vertex) {
+	if v == nil {
+		return
+	}
 	if _, ok := d.vertices[v]; ok {
 		d.muEdges.Lock()
 		delete(d.inboundEdge, v)
@@ -56,19 +59,17 @@ func (d *DAG) DeleteVertex(v *Vertex) {
 	}
 }
 
-// Add an edge, iff both vertices exist.
+// Add an edge (prevents circles).
 func (d *DAG) AddEdge(src *Vertex, dst *Vertex) error {
+	if src == nil || dst == nil {
+		return nil
+	}
 
-	// sanity checking
-	if src == dst {
-		return errors.New(fmt.Sprintf("src (%s) and dst (%s) must be different", (*src).String(), (*dst).String()))
-	}
-	if _, ok := d.vertices[src]; !ok {
-		return errors.New(fmt.Sprintf("%s is unknown", (*src).String()))
-	}
-	if _, ok := d.vertices[dst]; !ok {
-		return errors.New(fmt.Sprintf("%s is unknown", (*dst).String()))
-	}
+	// ensure vertices
+	d.muVertices.Lock()
+	d.vertices[src] = true
+	d.vertices[dst] = true
+	d.muVertices.Unlock()
 
 	// test / compute edge nodes
 	outbound, outboundExists := d.outboundEdge[src]
@@ -96,19 +97,8 @@ func (d *DAG) AddEdge(src *Vertex, dst *Vertex) error {
 	return nil
 }
 
-// Delete an edge, iff such exists.
-func (d *DAG) DeleteEdge(src *Vertex, dst *Vertex) error {
-
-	// sanity checking
-	if src == dst {
-		return errors.New(fmt.Sprintf("src (%s) and dst (%s) must be different", (*src).String(), (*dst).String()))
-	}
-	if _, ok := d.vertices[src]; !ok {
-		return errors.New(fmt.Sprintf("%s is unknown", (*src).String()))
-	}
-	if _, ok := d.vertices[dst]; !ok {
-		return errors.New(fmt.Sprintf("%s is unknown", (*dst).String()))
-	}
+// Delete an edge.
+func (d *DAG) DeleteEdge(src *Vertex, dst *Vertex) {
 
 	// test / compute edge nodes
 	_, outboundExists := d.outboundEdge[src][dst]
@@ -128,8 +118,6 @@ func (d *DAG) DeleteEdge(src *Vertex, dst *Vertex) error {
 		}
 		d.muEdges.Unlock()
 	}
-
-	return nil
 }
 
 // Return the total number of vertices.
@@ -147,111 +135,92 @@ func (d *DAG) GetSize() int {
 }
 
 // Return all vertices without children.
-func (d *DAG) GetLeafs() []*Vertex {
-	var leafs []*Vertex
+func (d *DAG) GetLeafs() idSet {
+	leafs := make(idSet)
 	for v := range d.vertices {
 		dstIds, ok := d.outboundEdge[v]
 		if !ok || len(dstIds) == 0 {
-			leafs = append(leafs, v)
+			leafs[v] = true
 		}
 	}
 	return leafs
 }
 
 // Return all vertices without parents.
-func (d *DAG) GetRoots() []*Vertex {
-	var roots []*Vertex
+func (d *DAG) GetRoots() idSet {
+	roots := make(idSet)
 	for v := range d.vertices {
 		srcIds, ok := d.inboundEdge[v]
 		if !ok || len(srcIds) == 0 {
-			roots = append(roots, v)
+			roots[v] = true
 		}
 	}
 	return roots
 }
 
 // Return all vertices.
-func (d *DAG) GetVertices() []*Vertex {
-	length := len(d.vertices)
-	vertices := make([]*Vertex, length)
-	i := 0
-	for v := range d.vertices {
-		vertices[i] = v
-		i += 1
-	}
-	return vertices
+func (d *DAG) GetVertices() idSet {
+	return d.vertices
 }
 
 // Return all children of the given vertex.
-func (d *DAG) GetChildren(v *Vertex) ([]*Vertex, error) {
+func (d *DAG) GetChildren(v *Vertex) (idSet, error) {
 	if _, ok := d.vertices[v]; !ok {
 		return nil, errors.New(fmt.Sprintf("%s is unknown", (*v).String()))
 	}
-	if children, ok := d.outboundEdge[v]; ok {
-		result := make([]*Vertex, len(children))
-		i := 0
-		for child := range children {
-			result[i] = child
-			i += 1
-		}
-		return result, nil
-	}
-	return nil, nil
+	return d.outboundEdge[v], nil
 }
 
 // Return all parents of the given vertex.
-func (d *DAG) GetParents(v *Vertex) ([]*Vertex, error) {
+func (d *DAG) GetParents(v *Vertex) (idSet, error) {
 	if _, ok := d.vertices[v]; !ok {
 		return nil, errors.New(fmt.Sprintf("%s is unknown", (*v).String()))
 	}
-	if parents, ok := d.inboundEdge[v]; ok {
-		result := make([]*Vertex, len(parents))
-		i := 0
-		for parent := range parents {
-			result[i] = parent
-			i += 1
-		}
-		return result, nil
-	}
-	return nil, nil
+	return d.inboundEdge[v], nil
 }
 
-func (d *DAG) getAncestorsAux(v *Vertex) []*Vertex {
-	var ancestors []*Vertex
+func (d *DAG) getAncestorsAux(v *Vertex, ancestors idSet, m sync.Mutex) {
 	if parents, ok := d.inboundEdge[v]; ok {
 		for parent := range parents {
-			ancestors = append(ancestors, d.getAncestorsAux(parent)...)
-			ancestors = append(ancestors, parent)
+			d.getAncestorsAux(parent, ancestors, m)
+			m.Lock()
+			ancestors[parent] = true
+			m.Unlock()
 		}
 	}
-	return ancestors
 }
 
 // Return all Ancestors of the given vertex.
-func (d *DAG) GetAncestors(v *Vertex) ([]*Vertex, error) {
+func (d *DAG) GetAncestors(v *Vertex) (idSet, error) {
 	if _, ok := d.vertices[v]; !ok {
 		return nil, errors.New(fmt.Sprintf("%s is unknown", (*v).String()))
 	}
-	return d.getAncestorsAux(v), nil
+	ancestors := make(idSet)
+	var m sync.Mutex
+	d.getAncestorsAux(v, ancestors, m)
+	return ancestors, nil
 }
 
-func (d *DAG) getDescendantsAux(v *Vertex) []*Vertex {
-	var descendants []*Vertex
-	if children, ok := d.outboundEdge[v]; ok {
+func (d *DAG) getDescendantsAux(v *Vertex, descendents idSet, m sync.Mutex) {
+	if children, ok := d.inboundEdge[v]; ok {
 		for child := range children {
-			descendants = append(descendants, d.getDescendantsAux(child)...)
-			descendants = append(descendants, child)
+			d.getDescendantsAux(child, descendents, m)
+			m.Lock()
+			descendents[child] = true
+			m.Unlock()
 		}
 	}
-	return descendants
 }
 
 // Return all Ancestors of the given vertex.
-func (d *DAG) GetDescendants(v *Vertex) ([]*Vertex, error) {
+func (d *DAG) GetDescendants(v *Vertex) (idSet, error) {
 	if _, ok := d.vertices[v]; !ok {
 		return nil, errors.New(fmt.Sprintf("%s is unknown", (*v).String()))
 	}
-	return d.getDescendantsAux(v), nil
+	descendents := make(idSet)
+	var m sync.Mutex
+	d.getDescendantsAux(v, descendents, m)
+	return descendents, nil
 }
 
 func (d *DAG) String() string {
