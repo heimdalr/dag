@@ -226,7 +226,7 @@ func (d *DAG) GetAncestors(v *Vertex) (idSet, error) {
 }
 
 func (d *DAG) getDescendantsAux(v *Vertex, descendents idSet, m sync.Mutex) {
-	if children, ok := d.inboundEdge[v]; ok {
+	if children, ok := d.outboundEdge[v]; ok {
 		for child := range children {
 			d.getDescendantsAux(child, descendents, m)
 			m.Lock()

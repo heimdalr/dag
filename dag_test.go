@@ -1,7 +1,6 @@
 package dag
 
 import (
-	"fmt"
 	"testing"
 )
 
@@ -112,15 +111,14 @@ func TestAddEdgeSafe(t *testing.T) {
 	src := makeVertex("src")
 	dst := makeVertex("dst")
 	if err := dag.AddEdgeSafe(src, src); err == nil {
-		t.Errorf("AddEdge(x, x) expected to return an error")
+		t.Errorf("AddEdgeSafe(x, x) expected to return an error")
 	}
 	if err := dag.AddEdgeSafe(src, dst); err != nil {
-		t.Errorf("AddEdge(x, y) unexpected error: %v", err)
+		t.Errorf("AddEdgeSafe(x, y) unexpected error: %v", err)
 	}
-	if err := dag.AddEdgeSafe(dst, src); err != nil {
-		t.Errorf("AddEdge(x, y) unexpected error: %v", err)
+	if err := dag.AddEdgeSafe(dst, src); err == nil {
+		t.Errorf("AddEdgeSafe(y, x) expected error: %v", err)
 	}
-	fmt.Printf("%v", dag.AddEdgeSafe(src, src))
 }
 
 func Test_Ancestors(t *testing.T) {
