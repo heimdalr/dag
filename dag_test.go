@@ -121,21 +121,31 @@ func TestAddEdgeSafe(t *testing.T) {
 	}
 }
 
-func Test_Ancestors(t *testing.T) {
+func TestGetAncestors(t *testing.T) {
 	dag := NewDAG()
-	var v1 Vertex = testVertex{"1"}
-	var v2 Vertex = testVertex{"2"}
-	var v3 Vertex = testVertex{"3"}
-	var v4 Vertex = testVertex{"4"}
-	_ = dag.AddEdge(&v1, &v2)
-	_ = dag.AddEdge(&v2, &v3)
-	_ = dag.AddEdge(&v2, &v4)
-	//fmt.Print(dag)
-	ancestors, err := dag.GetAncestors(&v4)
+	v1 := makeVertex("1")
+	v2 := makeVertex("2")
+	v3 := makeVertex("3")
+	v4 := makeVertex("4")
+	_ = dag.AddEdge(v1, v2)
+	_ = dag.AddEdge(v2, v3)
+	_ = dag.AddEdge(v2, v4)
+	ancestors, err := dag.GetAncestors(v4)
 	if err != nil {
-		t.Fatalf("Unexpected error: %s", err)
+		t.Errorf("GetAncestors(v4) unexpected error: %s", err)
 	}
 	if len(ancestors) != 2 {
-		t.Fatalf("DAG number of getAncestorsAux expected to be 2 but got %d", len(ancestors))
+		t.Errorf("GetAncestors(v4) = %d, want 2", len(ancestors))
 	}
+	if ancestors, _ := dag.GetAncestors(v1); len(ancestors) != 0 {
+		t.Errorf("GetAncestors(v1) = %d, want 0", len(ancestors))
+	}
+	if ancestors, _ := dag.GetAncestors(v2); len(ancestors) != 1 {
+		t.Errorf("GetAncestors(v2) = %d, want 1", len(ancestors))
+	}
+	v5 := makeVertex("5")
+	if _, err := dag.GetAncestors(v5); err == nil {
+		t.Error("GetAncestors(v2) expected to return an error")
+	}
+
 }
