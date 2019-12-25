@@ -117,8 +117,12 @@ func TestDAG_AddEdgeSafe(t *testing.T) {
 	dag := NewDAG()
 	src := makeVertex("src")
 	dst := makeVertex("dst")
-	if err := dag.AddEdgeSafe(src, src); err == nil {
+	loopErr := dag.AddEdgeSafe(src, src)
+	if loopErr == nil {
 		t.Error("AddEdgeSafe(x, x) expected to return an error")
+	}
+	if _, ok := loopErr.(LoopError); !ok {
+		t.Errorf("AddEdgeSafe(x, x) expected LoopError, got %s", loopErr)
 	}
 	if err := dag.AddEdgeSafe(src, dst); err != nil {
 		t.Errorf("AddEdgeSafe(x, y) unexpected error: %v", err)

@@ -1,7 +1,6 @@
 package dag
 
 import (
-	"errors"
 	"fmt"
 	"sync"
 )
@@ -10,10 +9,21 @@ type Vertex interface {
 	String() string
 }
 
-type VertexUnknownError string
+type VertexUnknownError struct {
+	v *Vertex
+}
 
-func (v VertexUnknownError) Error() string {
-	return fmt.Sprintf("%s is unknown", string(v))
+func (e VertexUnknownError) Error() string {
+	return fmt.Sprintf("%s is unknown", (*e.v).String())
+}
+
+type LoopError struct {
+	src *Vertex
+	dst *Vertex
+}
+
+func (e LoopError) Error() string {
+	return fmt.Sprintf("loop between %s and %s ", (*e.src).String(), (*e.dst).String())
 }
 
 type id = *Vertex
@@ -79,14 +89,14 @@ func (d *DAG) addEdgeAux(src *Vertex, dst *Vertex, check bool) error {
 	// check for circles, iff desired
 	if check {
 		if src == dst {
-			return errors.New("src and dst are euqal")
+			return LoopError{src, dst}
 		}
 		descendants, errDesc := d.GetDescendants(dst)
 		if errDesc != nil {
 			return errDesc
 		}
 		if descendants[src] {
-			return errors.New("circle detected")
+			return LoopError{src, dst}
 		}
 	}
 
@@ -196,8 +206,7 @@ func (d *DAG) GetVertices() idSet {
 // Return all children of the given vertex.
 func (d *DAG) GetChildren(v *Vertex) (idSet, error) {
 	if _, ok := d.vertices[v]; !ok {
-		return nil, VertexUnknownError((*v).String())
-		//return nil, errors.New(fmt.Sprintf("%s is unknown", (*v).String()))
+		return nil, VertexUnknownError{v}
 	}
 	return d.outboundEdge[v], nil
 }
@@ -205,7 +214,7 @@ func (d *DAG) GetChildren(v *Vertex) (idSet, error) {
 // Return all parents of the given vertex.
 func (d *DAG) GetParents(v *Vertex) (idSet, error) {
 	if _, ok := d.vertices[v]; !ok {
-		return nil, VertexUnknownError((*v).String())
+		return nil, VertexUnknownError{v}
 	}
 	return d.inboundEdge[v], nil
 }
@@ -224,7 +233,7 @@ func (d *DAG) getAncestorsAux(v *Vertex, ancestors idSet, m sync.Mutex) {
 // Return all Ancestors of the given vertex.
 func (d *DAG) GetAncestors(v *Vertex) (idSet, error) {
 	if _, ok := d.vertices[v]; !ok {
-		return nil, VertexUnknownError((*v).String())
+		return nil, VertexUnknownError{v}
 	}
 	ancestors := make(idSet)
 	var m sync.Mutex
@@ -246,7 +255,7 @@ func (d *DAG) getDescendantsAux(v *Vertex, descendents idSet, m sync.Mutex) {
 // Return all Ancestors of the given vertex.
 func (d *DAG) GetDescendants(v *Vertex) (idSet, error) {
 	if _, ok := d.vertices[v]; !ok {
-		return nil, VertexUnknownError((*v).String())
+		return nil, VertexUnknownError{v}
 	}
 	descendents := make(idSet)
 	var m sync.Mutex
