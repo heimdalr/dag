@@ -1,3 +1,4 @@
+// Package dag implements a Directed Acyclic Graph data structure and relevant methods.
 package dag
 
 import (
@@ -5,6 +6,7 @@ import (
 	"sync"
 )
 
+// Interface for the nodes in the DAG.
 type Vertex interface {
 	String() string
 }
