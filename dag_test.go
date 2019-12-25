@@ -119,10 +119,14 @@ func TestDAG_AddEdgeSafe(t *testing.T) {
 	dst := makeVertex("dst")
 	loopErr := dag.AddEdgeSafe(src, src)
 	if loopErr == nil {
-		t.Error("AddEdgeSafe(x, x) expected to return an error")
+		t.Error("AddEdgeSafe(src, src) expected error")
 	}
 	if _, ok := loopErr.(LoopError); !ok {
-		t.Errorf("AddEdgeSafe(x, x) expected LoopError, got %s", loopErr)
+		t.Errorf("AddEdgeSafe(src, src) expected LoopError, got %T", loopErr)
+	}
+	expectedText := "loop between 'src' and 'src'"
+	if text := loopErr.Error(); text != expectedText {
+		t.Errorf("AddEdgeSafe(src, src) = \"%s\", want \"%s\"", text, expectedText)
 	}
 	if err := dag.AddEdgeSafe(src, dst); err != nil {
 		t.Errorf("AddEdgeSafe(x, y) unexpected error: %v", err)
@@ -161,10 +165,11 @@ func TestDAG_GetChildren(t *testing.T) {
 		t.Errorf("GetChildren(v4) expected error")
 	}
 	if _, ok := errUnknown.(VertexUnknownError); !ok {
-		t.Errorf("GetChildren(v4) expected VertexUnknownError, got %s", errUnknown)
+		t.Errorf("GetChildren(v4) expected VertexUnknownError, got %T", errUnknown)
 	}
-	if errUnknown.Error() != "4 is unknown" {
-		t.Errorf("errUnknown.Error() = %s, want '4 is unknow'", errUnknown)
+	expectedText := "'4' is unknown"
+	if text := errUnknown.Error(); text != expectedText {
+		t.Errorf("GetChildren(v4) = \"%s\", want \"%s\"", errUnknown, expectedText)
 	}
 	children, errChildren := dag.GetChildren(v1)
 	if errChildren != nil {
@@ -180,6 +185,57 @@ func TestDAG_GetChildren(t *testing.T) {
 		t.Errorf("GetChildren()[v3] = %t, want false", truth)
 	}
 
+}
+
+func TestDAG_GetParents(t *testing.T) {
+	dag := NewDAG()
+	v1 := makeVertex("1")
+	_, errUnknown := dag.GetParents(v1)
+	if errUnknown == nil {
+		t.Errorf("GetParents(v1) expected error")
+	}
+	if _, ok := errUnknown.(VertexUnknownError); !ok {
+		t.Errorf("GetParents(v1) expected VertexUnknownError, got %T", errUnknown)
+	}
+	expectedText := "'1' is unknown"
+	if text := errUnknown.Error(); text != expectedText {
+		t.Errorf("GetParents(v1) = \"%s\", want \"%s\"", errUnknown, expectedText)
+	}
+}
+
+func TestDAG_GetDescendants(t *testing.T) {
+	dag := NewDAG()
+	v1 := makeVertex("1")
+	_, errUnknown := dag.GetDescendants(v1)
+	if errUnknown == nil {
+		t.Errorf("GetDescendants(v1) expected error")
+	}
+	if _, ok := errUnknown.(VertexUnknownError); !ok {
+		t.Errorf("GetDescendants(v1) expected VertexUnknownError, got %T", errUnknown)
+	}
+	expectedText := "'1' is unknown"
+	if text := errUnknown.Error(); text != expectedText {
+		t.Errorf("GetDescendants(v1) = \"%s\", want \"%s\"", errUnknown, expectedText)
+	}
+	v2 := makeVertex("2")
+	v3 := makeVertex("3")
+	v4 := makeVertex("4")
+	_ = dag.AddEdge(v1, v2)
+	_ = dag.AddEdge(v2, v3)
+	_ = dag.AddEdge(v2, v4)
+	desc, err := dag.GetDescendants(v1)
+	if err != nil {
+		t.Errorf("GetDescendants(v1) unexpected error: %s", err)
+	}
+	if len(desc) != 3 {
+		t.Errorf("GetDescendants(v1) = %d, want 3", len(desc))
+	}
+	if desc, _ := dag.GetDescendants(v4); len(desc) != 0 {
+		t.Errorf("GetDescendants(v4) = %d, want 0", len(desc))
+	}
+	if desc, _ := dag.GetDescendants(v2); len(desc) != 2 {
+		t.Errorf("GetDescendants(v2) = %d, want 2", len(desc))
+	}
 }
 
 func TestGetAncestors(t *testing.T) {
@@ -213,9 +269,23 @@ func TestGetAncestors(t *testing.T) {
 
 func TestDAG_String(t *testing.T) {
 	dag := NewDAG()
-	expected := `DAG Vertices: 0 - Edges: 0
+	v1 := makeVertex("1")
+	v2 := makeVertex("2")
+	v3 := makeVertex("3")
+	v4 := makeVertex("4")
+	_ = dag.AddEdge(v1, v2)
+	_ = dag.AddEdge(v2, v3)
+	_ = dag.AddEdge(v2, v4)
+	expected := `DAG Vertices: 4 - Edges: 3
 Vertices:
+  true
+  true
+  true
+  true
 Edges:
+  1 -> 2
+  2 -> 3
+  2 -> 4
 `
 	s := dag.String()
 	if s != expected {

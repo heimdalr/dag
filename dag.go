@@ -14,7 +14,7 @@ type VertexUnknownError struct {
 }
 
 func (e VertexUnknownError) Error() string {
-	return fmt.Sprintf("%s is unknown", (*e.v).String())
+	return fmt.Sprintf("'%s' is unknown", (*e.v).String())
 }
 
 type LoopError struct {
@@ -23,7 +23,7 @@ type LoopError struct {
 }
 
 func (e LoopError) Error() string {
-	return fmt.Sprintf("loop between %s and %s ", (*e.src).String(), (*e.dst).String())
+	return fmt.Sprintf("loop between '%s' and '%s'", (*e.src).String(), (*e.dst).String())
 }
 
 type id = *Vertex
@@ -91,10 +91,7 @@ func (d *DAG) addEdgeAux(src *Vertex, dst *Vertex, check bool) error {
 		if src == dst {
 			return LoopError{src, dst}
 		}
-		descendants, errDesc := d.GetDescendants(dst)
-		if errDesc != nil {
-			return errDesc
-		}
+		descendants, _ := d.GetDescendants(dst)
 		if descendants[src] {
 			return LoopError{src, dst}
 		}
