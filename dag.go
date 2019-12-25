@@ -9,24 +9,28 @@ type Vertex interface {
 	String() string
 }
 
+// Error type to describe the situation, that a given vertex does not exit in the graph.
 type VertexUnknownError struct {
 	v *Vertex
 }
 
+// Implements the `error` interface.
 func (e VertexUnknownError) Error() string {
 	return fmt.Sprintf("'%s' is unknown", (*e.v).String())
 }
 
+// Error type to describe loop errors (i.e. errors that where raised to prevent establishing loops in the graph).
 type LoopError struct {
 	src *Vertex
 	dst *Vertex
 }
 
+// Implements the `error` interface.
 func (e LoopError) Error() string {
 	return fmt.Sprintf("loop between '%s' and '%s'", (*e.src).String(), (*e.dst).String())
 }
 
-// DAG type implements a Directed Acyclic Graph data structure.
+// The DAG type implements a Directed Acyclic Graph.
 type DAG struct {
 	vertices     map[*Vertex]bool
 	muVertices   sync.Mutex
@@ -35,7 +39,7 @@ type DAG struct {
 	muEdges      sync.Mutex
 }
 
-// Creates a new Directed Acyclic Graph or DAG.
+// Creates / initializes a new Directed Acyclic Graph or DAG.
 func NewDAG() *DAG {
 	d := &DAG{
 		vertices:     make(map[*Vertex]bool),
