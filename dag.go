@@ -26,24 +26,21 @@ func (e LoopError) Error() string {
 	return fmt.Sprintf("loop between '%s' and '%s'", (*e.src).String(), (*e.dst).String())
 }
 
-type id = *Vertex
-type idSet = map[id]bool
-
 // DAG type implements a Directed Acyclic Graph data structure.
 type DAG struct {
-	vertices     idSet
+	vertices     map[*Vertex]bool
 	muVertices   sync.Mutex
-	inboundEdge  map[id]idSet
-	outboundEdge map[id]idSet
+	inboundEdge  map[*Vertex]map[*Vertex]bool
+	outboundEdge map[*Vertex]map[*Vertex]bool
 	muEdges      sync.Mutex
 }
 
 // Creates a new Directed Acyclic Graph or DAG.
 func NewDAG() *DAG {
 	d := &DAG{
-		vertices:     make(idSet),
-		inboundEdge:  make(map[id]idSet),
-		outboundEdge: make(map[id]idSet),
+		vertices:     make(map[*Vertex]bool),
+		inboundEdge:  make(map[*Vertex]map[*Vertex]bool),
+		outboundEdge: make(map[*Vertex]map[*Vertex]bool),
 	}
 	return d
 }
@@ -105,7 +102,7 @@ func (d *DAG) addEdgeAux(src *Vertex, dst *Vertex, check bool) error {
 
 	// add outbound
 	if !outboundExists {
-		newSet := make(idSet)
+		newSet := make(map[*Vertex]bool)
 		d.outboundEdge[src] = newSet
 		outbound = newSet
 	}
@@ -113,7 +110,7 @@ func (d *DAG) addEdgeAux(src *Vertex, dst *Vertex, check bool) error {
 
 	// add inbound
 	if !inboundExists {
-		newSet := make(idSet)
+		newSet := make(map[*Vertex]bool)
 		d.inboundEdge[dst] = newSet
 		inbound = newSet
 	}
@@ -172,8 +169,8 @@ func (d *DAG) GetSize() int {
 }
 
 // Return all vertices without children.
-func (d *DAG) GetLeafs() idSet {
-	leafs := make(idSet)
+func (d *DAG) GetLeafs() map[*Vertex]bool {
+	leafs := make(map[*Vertex]bool)
 	for v := range d.vertices {
 		dstIds, ok := d.outboundEdge[v]
 		if !ok || len(dstIds) == 0 {
@@ -184,8 +181,8 @@ func (d *DAG) GetLeafs() idSet {
 }
 
 // Return all vertices without parents.
-func (d *DAG) GetRoots() idSet {
-	roots := make(idSet)
+func (d *DAG) GetRoots() map[*Vertex]bool {
+	roots := make(map[*Vertex]bool)
 	for v := range d.vertices {
 		srcIds, ok := d.inboundEdge[v]
 		if !ok || len(srcIds) == 0 {
@@ -196,12 +193,12 @@ func (d *DAG) GetRoots() idSet {
 }
 
 // Return all vertices.
-func (d *DAG) GetVertices() idSet {
+func (d *DAG) GetVertices() map[*Vertex]bool {
 	return d.vertices
 }
 
 // Return all children of the given vertex.
-func (d *DAG) GetChildren(v *Vertex) (idSet, error) {
+func (d *DAG) GetChildren(v *Vertex) (map[*Vertex]bool, error) {
 	if _, ok := d.vertices[v]; !ok {
 		return nil, VertexUnknownError{v}
 	}
@@ -209,14 +206,14 @@ func (d *DAG) GetChildren(v *Vertex) (idSet, error) {
 }
 
 // Return all parents of the given vertex.
-func (d *DAG) GetParents(v *Vertex) (idSet, error) {
+func (d *DAG) GetParents(v *Vertex) (map[*Vertex]bool, error) {
 	if _, ok := d.vertices[v]; !ok {
 		return nil, VertexUnknownError{v}
 	}
 	return d.inboundEdge[v], nil
 }
 
-func (d *DAG) getAncestorsAux(v *Vertex, ancestors idSet, m sync.Mutex) {
+func (d *DAG) getAncestorsAux(v *Vertex, ancestors map[*Vertex]bool, m sync.Mutex) {
 	if parents, ok := d.inboundEdge[v]; ok {
 		for parent := range parents {
 			d.getAncestorsAux(parent, ancestors, m)
@@ -228,17 +225,17 @@ func (d *DAG) getAncestorsAux(v *Vertex, ancestors idSet, m sync.Mutex) {
 }
 
 // Return all Ancestors of the given vertex.
-func (d *DAG) GetAncestors(v *Vertex) (idSet, error) {
+func (d *DAG) GetAncestors(v *Vertex) (map[*Vertex]bool, error) {
 	if _, ok := d.vertices[v]; !ok {
 		return nil, VertexUnknownError{v}
 	}
-	ancestors := make(idSet)
+	ancestors := make(map[*Vertex]bool)
 	var m sync.Mutex
 	d.getAncestorsAux(v, ancestors, m)
 	return ancestors, nil
 }
 
-func (d *DAG) getDescendantsAux(v *Vertex, descendents idSet, m sync.Mutex) {
+func (d *DAG) getDescendantsAux(v *Vertex, descendents map[*Vertex]bool, m sync.Mutex) {
 	if children, ok := d.outboundEdge[v]; ok {
 		for child := range children {
 			d.getDescendantsAux(child, descendents, m)
@@ -250,11 +247,11 @@ func (d *DAG) getDescendantsAux(v *Vertex, descendents idSet, m sync.Mutex) {
 }
 
 // Return all Ancestors of the given vertex.
-func (d *DAG) GetDescendants(v *Vertex) (idSet, error) {
+func (d *DAG) GetDescendants(v *Vertex) (map[*Vertex]bool, error) {
 	if _, ok := d.vertices[v]; !ok {
 		return nil, VertexUnknownError{v}
 	}
-	descendents := make(idSet)
+	descendents := make(map[*Vertex]bool)
 	var m sync.Mutex
 	d.getDescendantsAux(v, descendents, m)
 	return descendents, nil
@@ -263,8 +260,8 @@ func (d *DAG) GetDescendants(v *Vertex) (idSet, error) {
 func (d *DAG) String() string {
 	result := fmt.Sprintf("DAG Vertices: %d - Edges: %d\n", d.GetOrder(), d.GetSize())
 	result += fmt.Sprintf("Vertices:\n")
-	for _, v := range d.vertices {
-		result += fmt.Sprintf("  %v\n", v)
+	for k := range d.vertices {
+		result += fmt.Sprintf("  %v\n", (*k).String())
 	}
 	result += fmt.Sprintf("Edges:\n")
 	for v, children := range d.outboundEdge {
