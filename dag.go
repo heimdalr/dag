@@ -246,7 +246,7 @@ func (d *DAG) getDescendantsAux(v *Vertex, descendents map[*Vertex]bool, m sync.
 	}
 }
 
-// Return all Ancestors of the given vertex.
+// Return all Descendants of the given vertex.
 func (d *DAG) GetDescendants(v *Vertex) (map[*Vertex]bool, error) {
 	if _, ok := d.vertices[v]; !ok {
 		return nil, VertexUnknownError{v}
