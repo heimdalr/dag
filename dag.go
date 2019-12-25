@@ -16,7 +16,7 @@ type VertexUnknownError struct {
 	v *Vertex
 }
 
-// Implements the `error` interface.
+// Implements the error interface.
 func (e VertexUnknownError) Error() string {
 	return fmt.Sprintf("'%s' is unknown", (*e.v).String())
 }
@@ -27,7 +27,7 @@ type LoopError struct {
 	dst *Vertex
 }
 
-// Implements the `error` interface.
+// Implements the error interface.
 func (e LoopError) Error() string {
 	return fmt.Sprintf("loop between '%s' and '%s'", (*e.src).String(), (*e.dst).String())
 }
