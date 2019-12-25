@@ -14,6 +14,7 @@ func (v testVertex) String() string {
 
 func makeVertex(label string) *Vertex {
 	var v Vertex = testVertex{label}
+	//v2 := testVertex{label}.(Vertex)
 	return &v
 }
 
@@ -27,8 +28,9 @@ func TestNewDAG(t *testing.T) {
 	}
 }
 
-func TestAddVertex(t *testing.T) {
+func TestDAG_AddVertex(t *testing.T) {
 	dag := NewDAG()
+	dag.AddVertex(nil)
 	v := makeVertex("1")
 	dag.AddVertex(v)
 	if order := dag.GetOrder(); order != 1 {
@@ -51,10 +53,14 @@ func TestAddVertex(t *testing.T) {
 	}
 }
 
-func TestDeleteVertex(t *testing.T) {
+func TestDAG_DeleteVertex(t *testing.T) {
 	dag := NewDAG()
 	v := makeVertex("1")
 	dag.AddVertex(v)
+	dag.DeleteVertex(nil)
+	if order := dag.GetOrder(); order != 1 {
+		t.Errorf("GetOrder() = %d, want 1", order)
+	}
 	dag.DeleteVertex(v)
 	if order := dag.GetOrder(); order != 0 {
 		t.Errorf("GetOrder() = %d, want 0", order)
@@ -73,8 +79,9 @@ func TestDeleteVertex(t *testing.T) {
 	}
 }
 
-func TestAddEdge(t *testing.T) {
+func TestDAG_AddEdge(t *testing.T) {
 	dag := NewDAG()
+	_ = dag.AddEdge(nil, nil)
 	src := makeVertex("src")
 	dst := makeVertex("dst")
 	err := dag.AddEdge(src, dst)
@@ -102,16 +109,16 @@ func TestAddEdge(t *testing.T) {
 		t.Errorf("GetLeafs() = %d, want 1", roots)
 	}
 	if err := dag.AddEdge(src, src); err != nil {
-		t.Errorf("AddEdge(x, x) expected to not return an error")
+		t.Error("AddEdge(x, x) expected to not return an error")
 	}
 }
 
-func TestAddEdgeSafe(t *testing.T) {
+func TestDAG_AddEdgeSafe(t *testing.T) {
 	dag := NewDAG()
 	src := makeVertex("src")
 	dst := makeVertex("dst")
 	if err := dag.AddEdgeSafe(src, src); err == nil {
-		t.Errorf("AddEdgeSafe(x, x) expected to return an error")
+		t.Error("AddEdgeSafe(x, x) expected to return an error")
 	}
 	if err := dag.AddEdgeSafe(src, dst); err != nil {
 		t.Errorf("AddEdgeSafe(x, y) unexpected error: %v", err)
@@ -119,6 +126,56 @@ func TestAddEdgeSafe(t *testing.T) {
 	if err := dag.AddEdgeSafe(dst, src); err == nil {
 		t.Errorf("AddEdgeSafe(y, x) expected error: %v", err)
 	}
+}
+
+func TestDAG_DeleteEdge(t *testing.T) {
+	dag := NewDAG()
+	src := makeVertex("src")
+	dst := makeVertex("dst")
+	_ = dag.AddEdge(src, dst)
+	if size := dag.GetSize(); size != 1 {
+		t.Errorf("GetSize() = %d, want 1", size)
+	}
+	dag.DeleteEdge(src, nil)
+	dag.DeleteEdge(src, dst)
+	if size := dag.GetSize(); size != 0 {
+		t.Errorf("GetSize() = %d, want 0", size)
+	}
+	dag.DeleteEdge(src, dst)
+}
+
+func TestDAG_GetChildren(t *testing.T) {
+	dag := NewDAG()
+	v1 := makeVertex("1")
+	v2 := makeVertex("2")
+	v3 := makeVertex("3")
+	v4 := makeVertex("4")
+	_ = dag.AddEdge(v1, v2)
+	_ = dag.AddEdge(v2, v3)
+	_, errUnknown := dag.GetChildren(v4)
+	if errUnknown == nil {
+		t.Errorf("GetChildren(v4) expected error")
+	}
+	if _, ok := errUnknown.(VertexUnknownError); !ok {
+		t.Errorf("GetChildren(v4) expected VertexUnknownError, got %s", errUnknown)
+	}
+	if errUnknown.Error() != "4 is unknown" {
+		t.Errorf("errUnknown.Error() = %s, want '4 is unknow'", errUnknown)
+	}
+	children, errChildren := dag.GetChildren(v1)
+	if errChildren != nil {
+		t.Error(errChildren)
+	}
+	if length := len(children); length != 1 {
+		t.Errorf("GetChildren() = %d, want 1", length)
+	}
+	if truth := children[v2]; !truth {
+		t.Errorf("GetChildren()[v2] = %t, want true", truth)
+	}
+	if truth := children[v3]; truth {
+		t.Errorf("GetChildren()[v3] = %t, want false", truth)
+	}
+
 }
 
 func TestGetAncestors(t *testing.T) {
@@ -148,4 +205,16 @@ func TestGetAncestors(t *testing.T) {
 		t.Error("GetAncestors(v2) expected to return an error")
 	}
 
+}
+
+func TestDAG_String(t *testing.T) {
+	dag := NewDAG()
+	expected := `DAG Vertices: 0 - Edges: 0
+Vertices:
+Edges:
+`
+	s := dag.String()
+	if s != expected {
+		t.Errorf("String() = %s, want %s", s, expected)
+	}
 }

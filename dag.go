@@ -10,6 +10,12 @@ type Vertex interface {
 	String() string
 }
 
+type VertexUnknownError string
+
+func (v VertexUnknownError) Error() string {
+	return fmt.Sprintf("%s is unknown", string(v))
+}
+
 type id = *Vertex
 type idSet = map[id]bool
 
@@ -190,7 +196,8 @@ func (d *DAG) GetVertices() idSet {
 // Return all children of the given vertex.
 func (d *DAG) GetChildren(v *Vertex) (idSet, error) {
 	if _, ok := d.vertices[v]; !ok {
-		return nil, errors.New(fmt.Sprintf("%s is unknown", (*v).String()))
+		return nil, VertexUnknownError((*v).String())
+		//return nil, errors.New(fmt.Sprintf("%s is unknown", (*v).String()))
 	}
 	return d.outboundEdge[v], nil
 }
@@ -198,7 +205,7 @@ func (d *DAG) GetChildren(v *Vertex) (idSet, error) {
 // Return all parents of the given vertex.
 func (d *DAG) GetParents(v *Vertex) (idSet, error) {
 	if _, ok := d.vertices[v]; !ok {
-		return nil, errors.New(fmt.Sprintf("%s is unknown", (*v).String()))
+		return nil, VertexUnknownError((*v).String())
 	}
 	return d.inboundEdge[v], nil
 }
@@ -217,7 +224,7 @@ func (d *DAG) getAncestorsAux(v *Vertex, ancestors idSet, m sync.Mutex) {
 // Return all Ancestors of the given vertex.
 func (d *DAG) GetAncestors(v *Vertex) (idSet, error) {
 	if _, ok := d.vertices[v]; !ok {
-		return nil, errors.New(fmt.Sprintf("%s is unknown", (*v).String()))
+		return nil, VertexUnknownError((*v).String())
 	}
 	ancestors := make(idSet)
 	var m sync.Mutex
@@ -239,7 +246,7 @@ func (d *DAG) getDescendantsAux(v *Vertex, descendents idSet, m sync.Mutex) {
 // Return all Ancestors of the given vertex.
 func (d *DAG) GetDescendants(v *Vertex) (idSet, error) {
 	if _, ok := d.vertices[v]; !ok {
-		return nil, errors.New(fmt.Sprintf("%s is unknown", (*v).String()))
+		return nil, VertexUnknownError((*v).String())
 	}
 	descendents := make(idSet)
 	var m sync.Mutex
