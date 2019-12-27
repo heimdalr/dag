@@ -43,12 +43,11 @@ type DAG struct {
 
 // Creates / initializes a new Directed Acyclic Graph or DAG.
 func NewDAG() *DAG {
-	d := &DAG{
+	return &DAG{
 		vertices:     make(map[Vertex]bool),
 		inboundEdge:  make(map[Vertex]map[Vertex]bool),
 		outboundEdge: make(map[Vertex]map[Vertex]bool),
 	}
-	return d
 }
 
 // Add a vertex.
