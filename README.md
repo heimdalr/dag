@@ -16,7 +16,7 @@ package main
 
 import (
 	"fmt"
-	"github.com/sebogh/dag"
+	"github.com/heimdalr/dag"
 )
 
 // data structure that will be used as vertex in the graph
