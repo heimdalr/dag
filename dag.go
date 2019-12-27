@@ -219,7 +219,7 @@ func (d *DAG) GetParents(v *Vertex) (map[*Vertex]bool, error) {
 	return d.inboundEdge[v], nil
 }
 
-func (d *DAG) getAncestorsAux(v *Vertex, ancestors map[*Vertex]bool, m sync.Mutex) {
+func (d *DAG) getAncestorsAux(v *Vertex, ancestors map[*Vertex]bool, m *sync.Mutex) {
 	if parents, ok := d.inboundEdge[v]; ok {
 		for parent := range parents {
 			d.getAncestorsAux(parent, ancestors, m)
@@ -237,11 +237,11 @@ func (d *DAG) GetAncestors(v *Vertex) (map[*Vertex]bool, error) {
 	}
 	ancestors := make(map[*Vertex]bool)
 	var m sync.Mutex
-	d.getAncestorsAux(v, ancestors, m)
+	d.getAncestorsAux(v, ancestors, &m)
 	return ancestors, nil
 }
 
-func (d *DAG) getDescendantsAux(v *Vertex, descendents map[*Vertex]bool, m sync.Mutex) {
+func (d *DAG) getDescendantsAux(v *Vertex, descendents map[*Vertex]bool, m *sync.Mutex) {
 	if children, ok := d.outboundEdge[v]; ok {
 		for child := range children {
 			d.getDescendantsAux(child, descendents, m)
@@ -259,7 +259,7 @@ func (d *DAG) GetDescendants(v *Vertex) (map[*Vertex]bool, error) {
 	}
 	descendents := make(map[*Vertex]bool)
 	var m sync.Mutex
-	d.getDescendantsAux(v, descendents, m)
+	d.getDescendantsAux(v, descendents, &m)
 	return descendents, nil
 }
 
