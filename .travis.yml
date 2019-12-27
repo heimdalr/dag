@@ -10,19 +10,12 @@ env: GO111MODULE=on GOFLAGS='-mod vendor'
 # You don't need to test on very old versions of the Go compiler. It's the user's
 # responsibility to keep their compiler up to date.
 go:
-  - 1.13.x
+  - 1.13
 
 # Only clone the most recent commit.
 git:
   depth: 1
 
-# Skip the install step. Don't `go get` dependencies. Only build with the code
-# in vendor/
-install: true
-
-# Don't email me the results of the test runs.
-notifications:
-  email: false
 
 # Anything in before_script that returns a nonzero exit code will flunk the
 # build and immediately stop. It's sorta like having set -e enabled in bash.
