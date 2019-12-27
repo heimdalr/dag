@@ -12,12 +12,6 @@ func (v testVertex) String() string {
 	return v.Label
 }
 
-func makeVertex(label string) *Vertex {
-	var v Vertex = testVertex{label}
-	//v2 := testVertex{label}.(Vertex)
-	return &v
-}
-
 func TestNewDAG(t *testing.T) {
 	dag := NewDAG()
 	if order := dag.GetOrder(); order != 0 {
@@ -31,7 +25,7 @@ func TestNewDAG(t *testing.T) {
 func TestDAG_AddVertex(t *testing.T) {
 	dag := NewDAG()
 	dag.AddVertex(nil)
-	v := makeVertex("1")
+	v := &testVertex{"1"}
 	dag.AddVertex(v)
 	if order := dag.GetOrder(); order != 1 {
 		t.Errorf("GetOrder() = %d, want 1", order)
@@ -55,7 +49,7 @@ func TestDAG_AddVertex(t *testing.T) {
 
 func TestDAG_DeleteVertex(t *testing.T) {
 	dag := NewDAG()
-	v := makeVertex("1")
+	v := &testVertex{"1"}
 	dag.AddVertex(v)
 	dag.DeleteVertex(nil)
 	if order := dag.GetOrder(); order != 1 {
@@ -82,8 +76,8 @@ func TestDAG_DeleteVertex(t *testing.T) {
 func TestDAG_AddEdge(t *testing.T) {
 	dag := NewDAG()
 	_ = dag.AddEdge(nil, nil)
-	src := makeVertex("src")
-	dst := makeVertex("dst")
+	src := &testVertex{"src"}
+	dst := &testVertex{"dst"}
 	err := dag.AddEdge(src, dst)
 	if err != nil {
 		t.Error(err)
@@ -115,8 +109,8 @@ func TestDAG_AddEdge(t *testing.T) {
 
 func TestDAG_AddEdgeSafe(t *testing.T) {
 	dag := NewDAG()
-	src := makeVertex("src")
-	dst := makeVertex("dst")
+	src := &testVertex{"src"}
+	dst := &testVertex{"dst"}
 	loopErr := dag.AddEdgeSafe(src, src)
 	if loopErr == nil {
 		t.Error("AddEdgeSafe(src, src) expected error")
@@ -139,8 +133,8 @@ func TestDAG_AddEdgeSafe(t *testing.T) {
 
 func TestDAG_DeleteEdge(t *testing.T) {
 	dag := NewDAG()
-	src := makeVertex("src")
-	dst := makeVertex("dst")
+	src := &testVertex{"src"}
+	dst := &testVertex{"dst"}
 	_ = dag.AddEdge(src, dst)
 	if size := dag.GetSize(); size != 1 {
 		t.Errorf("GetSize() = %d, want 1", size)
@@ -155,10 +149,10 @@ func TestDAG_DeleteEdge(t *testing.T) {
 
 func TestDAG_GetChildren(t *testing.T) {
 	dag := NewDAG()
-	v1 := makeVertex("1")
-	v2 := makeVertex("2")
-	v3 := makeVertex("3")
-	v4 := makeVertex("4")
+	v1 := &testVertex{"1"}
+	v2 := &testVertex{"2"}
+	v3 := &testVertex{"3"}
+	v4 := &testVertex{"4"}
 	_ = dag.AddEdge(v1, v2)
 	_ = dag.AddEdge(v2, v3)
 	_, errUnknown := dag.GetChildren(v4)
@@ -191,7 +185,7 @@ func TestDAG_GetChildren(t *testing.T) {
 
 func TestDAG_GetParents(t *testing.T) {
 	dag := NewDAG()
-	v1 := makeVertex("1")
+	v1 := &testVertex{"1"}
 	_, errUnknown := dag.GetParents(v1)
 	if errUnknown == nil {
 		t.Errorf("GetParents(v1) expected error")
@@ -208,7 +202,7 @@ func TestDAG_GetParents(t *testing.T) {
 
 func TestDAG_GetDescendants(t *testing.T) {
 	dag := NewDAG()
-	v1 := makeVertex("1")
+	v1 := &testVertex{"1"}
 	_, errUnknown := dag.GetDescendants(v1)
 	if errUnknown == nil {
 		t.Errorf("GetDescendants(v1) expected error")
@@ -221,9 +215,9 @@ func TestDAG_GetDescendants(t *testing.T) {
 			t.Errorf("GetDescendants(v1) = \"%s\", want \"%s\"", errUnknown, expectedText)
 		}
 	}
-	v2 := makeVertex("2")
-	v3 := makeVertex("3")
-	v4 := makeVertex("4")
+	v2 := &testVertex{"2"}
+	v3 := &testVertex{"3"}
+	v4 := &testVertex{"4"}
 	_ = dag.AddEdge(v1, v2)
 	_ = dag.AddEdge(v2, v3)
 	_ = dag.AddEdge(v2, v4)
@@ -244,10 +238,10 @@ func TestDAG_GetDescendants(t *testing.T) {
 
 func TestGetAncestors(t *testing.T) {
 	dag := NewDAG()
-	v1 := makeVertex("1")
-	v2 := makeVertex("2")
-	v3 := makeVertex("3")
-	v4 := makeVertex("4")
+	v1 := &testVertex{"1"}
+	v2 := &testVertex{"2"}
+	v3 := &testVertex{"3"}
+	v4 := &testVertex{"4"}
 	_ = dag.AddEdge(v1, v2)
 	_ = dag.AddEdge(v2, v3)
 	_ = dag.AddEdge(v2, v4)
@@ -264,7 +258,7 @@ func TestGetAncestors(t *testing.T) {
 	if ancestors, _ := dag.GetAncestors(v2); len(ancestors) != 1 {
 		t.Errorf("GetAncestors(v2) = %d, want 1", len(ancestors))
 	}
-	v5 := makeVertex("5")
+	v5 := &testVertex{"5"}
 	if _, err := dag.GetAncestors(v5); err == nil {
 		t.Error("GetAncestors(v2) expected to return an error")
 	}
@@ -273,10 +267,10 @@ func TestGetAncestors(t *testing.T) {
 
 func TestDAG_String(t *testing.T) {
 	dag := NewDAG()
-	v1 := makeVertex("1")
-	v2 := makeVertex("2")
-	v3 := makeVertex("3")
-	v4 := makeVertex("4")
+	v1 := &testVertex{"1"}
+	v2 := &testVertex{"2"}
+	v3 := &testVertex{"3"}
+	v4 := &testVertex{"4"}
 	_ = dag.AddEdge(v1, v2)
 	_ = dag.AddEdge(v2, v3)
 	_ = dag.AddEdge(v2, v4)

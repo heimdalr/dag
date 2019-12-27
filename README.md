@@ -35,13 +35,13 @@ func main() {
 	d := dag.NewDAG()
 
 	// init three vertices
-	var v1 dag.Vertex = myVertex{"1"}
-	var v2 dag.Vertex = myVertex{"2"}
-	var v3 dag.Vertex = myVertex{"3"}
+	v1 := &myVertex{"1"}
+	v2 := &myVertex{"2"}
+	v3 := &myVertex{"3"}
 
 	// add the above vertices and connect them with two edges
-	_ = d.AddEdge(&v1, &v2)
-	_ = d.AddEdge(&v1, &v3)
+	_ = d.AddEdge(v1, v2)
+	_ = d.AddEdge(v1, v3)
 
 	// describe the graph
 	fmt.Print(d.String())
