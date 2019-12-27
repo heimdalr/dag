@@ -126,7 +126,7 @@ func (d *DAG) addEdgeAux(src *Vertex, dst *Vertex, check bool) error {
 	return nil
 }
 
-// Add an edge prevents circles
+// Add an edge prevents circles.
 func (d *DAG) AddEdgeSafe(src *Vertex, dst *Vertex) error {
 	return d.addEdgeAux(src, dst, true)
 }
@@ -263,6 +263,7 @@ func (d *DAG) GetDescendants(v *Vertex) (map[*Vertex]bool, error) {
 	return descendents, nil
 }
 
+// Return a representation of the graph.
 func (d *DAG) String() string {
 	result := fmt.Sprintf("DAG Vertices: %d - Edges: %d\n", d.GetOrder(), d.GetSize())
 	result += fmt.Sprintf("Vertices:\n")
