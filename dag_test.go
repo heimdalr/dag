@@ -102,16 +102,7 @@ func TestDAG_AddEdge(t *testing.T) {
 	if roots := len(dag.GetRoots()); roots != 1 {
 		t.Errorf("GetLeafs() = %d, want 1", roots)
 	}
-	if err := dag.AddEdge(src, src); err != nil {
-		t.Error("AddEdge(x, x) expected to not return an error")
-	}
-}
-
-func TestDAG_AddEdgeSafe(t *testing.T) {
-	dag := NewDAG()
-	src := &testVertex{"src"}
-	dst := &testVertex{"dst"}
-	loopErr := dag.AddEdgeSafe(src, src)
+	loopErr := dag.AddEdge(src, src)
 	if loopErr == nil {
 		t.Error("AddEdgeSafe(src, src) expected error")
 	} else {
@@ -123,10 +114,10 @@ func TestDAG_AddEdgeSafe(t *testing.T) {
 			t.Errorf("AddEdgeSafe(src, src) = \"%s\", want \"%s\"", text, expectedText)
 		}
 	}
-	if err := dag.AddEdgeSafe(src, dst); err != nil {
+	if err := dag.AddEdge(src, dst); err != nil {
 		t.Errorf("AddEdgeSafe(x, y) unexpected error: %v", err)
 	}
-	if err := dag.AddEdgeSafe(dst, src); err == nil {
+	if err := dag.AddEdge(dst, src); err == nil {
 		t.Errorf("AddEdgeSafe(y, x) expected error: %v", err)
 	}
 }

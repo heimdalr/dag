@@ -38,21 +38,27 @@ func NewDAG() *DAG {
 // Add a vertex.
 // For vertices that are part of an edge use AddEdge() instead.
 func (d *DAG) AddVertex(v Vertex) error {
+
+	// sanity checking
 	if v == nil {
 		return VertexNilError{}
 	}
 	if _, exists := d.vertices[v]; exists {
 		return VertexDuplicateError{v}
 	}
+
 	d.muVertices.Lock()
 	d.vertices[v] = true
 	d.muVertices.Unlock()
+
 	return nil
 }
 
 // Delete a vertex including all inbound and outbound edges. Delete cached ancestors and descendants of relevant
 // vertices.
 func (d *DAG) DeleteVertex(v Vertex) error {
+
+	// sanity checking
 	if v == nil {
 		return VertexNilError{}
 	}
@@ -106,14 +112,21 @@ func (d *DAG) DeleteVertex(v Vertex) error {
 
 	// delete v itself
 	delete(d.vertices, v)
+
 	d.muVertices.Unlock()
 
 	return nil
 }
 
-func (d *DAG) addEdgeAux(src Vertex, dst Vertex, check bool) error {
-	if src == nil || dst == nil {
-		return nil
+// Add an edge while preventing circles.
+func (d *DAG) AddEdge(src Vertex, dst Vertex) error {
+
+	// sanity checking
+	if src == nil  {
+		return VertexNilError{}
+	}
+	if dst == nil {
+		return VertexNilError{}
 	}
 
 	// ensure vertices
@@ -121,17 +134,6 @@ func (d *DAG) addEdgeAux(src Vertex, dst Vertex, check bool) error {
 	d.vertices[src] = true
 	d.vertices[dst] = true
 	d.muVertices.Unlock()
-
-	// check for circles, iff desired
-	if check {
-		if src == dst {
-			return EdgeLoopError{src, dst}
-		}
-		descendants, _ := d.GetDescendants(dst)
-		if descendants[src] {
-			return EdgeLoopError{src, dst}
-		}
-	}
 
 	// test / compute edge nodes
 	_, outboundExists := d.outboundEdge[src]
@@ -142,8 +144,14 @@ func (d *DAG) addEdgeAux(src Vertex, dst Vertex, check bool) error {
 		return nil
 	}
 
+	// get descendents and ancestors as they are now
 	descendants, _ := d.GetDescendants(dst)
 	ancestors, _ := d.GetAncestors(dst)
+
+	// check for circles, iff desired
+	if src == dst || descendants[src] {
+		return EdgeLoopError{src, dst}
+	}
 
 	d.muEdges.Lock()
 
@@ -180,17 +188,8 @@ func (d *DAG) addEdgeAux(src Vertex, dst Vertex, check bool) error {
 	d.inboundEdge[dst][src] = true
 
 	d.muEdges.Unlock()
+
 	return nil
-}
-
-// Add an edge while preventing circles.
-func (d *DAG) AddEdgeSafe(src Vertex, dst Vertex) error {
-	return d.addEdgeAux(src, dst, true)
-}
-
-// Add an edge without checking for circles.
-func (d *DAG) AddEdge(src Vertex, dst Vertex) error {
-	return d.addEdgeAux(src, dst, false)
 }
 
 // Delete an edge.
