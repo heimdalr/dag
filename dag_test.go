@@ -115,10 +115,10 @@ func TestDAG_AddEdgeSafe(t *testing.T) {
 	if loopErr == nil {
 		t.Error("AddEdgeSafe(src, src) expected error")
 	} else {
-		if _, ok := loopErr.(LoopError); !ok {
-			t.Errorf("AddEdgeSafe(src, src) expected LoopError, got %T", loopErr)
+		if _, ok := loopErr.(EdgeLoopError); !ok {
+			t.Errorf("AddEdgeSafe(src, src) expected EdgeLoopError, got %T", loopErr)
 		}
-		expectedText := "loop between 'src' and 'src'"
+		expectedText := "edge between 'src' and 'src' would create a loop"
 		if text := loopErr.Error(); text != expectedText {
 			t.Errorf("AddEdgeSafe(src, src) = \"%s\", want \"%s\"", text, expectedText)
 		}
@@ -234,9 +234,13 @@ func TestDAG_GetDescendants(t *testing.T) {
 	if desc, _ := dag.GetDescendants(v2); len(desc) != 2 {
 		t.Errorf("GetDescendants(v2) = %d, want 2", len(desc))
 	}
+	_ = dag.AddEdge(v2, v4)
+	if desc, _ := dag.GetDescendants(v2); len(desc) != 2 {
+		t.Errorf("GetDescendants(v2) = %d, want 2", len(desc))
+	}
 }
 
-func TestGetAncestors(t *testing.T) {
+func TestDAG_GetAncestors(t *testing.T) {
 	dag := NewDAG()
 	v1 := &testVertex{"1"}
 	v2 := &testVertex{"2"}
@@ -261,6 +265,28 @@ func TestGetAncestors(t *testing.T) {
 	v5 := &testVertex{"5"}
 	if _, err := dag.GetAncestors(v5); err == nil {
 		t.Error("GetAncestors(v2) expected to return an error")
+	}
+	_ = dag.AddEdge(v4, v5)
+	_ = dag.AddEdge(v3, v5)
+	if ancestors, _ := dag.GetAncestors(v5); len(ancestors) != 4 {
+		t.Errorf("GetAncestors(v5) = %d, want 4", len(ancestors))
+	}
+	if ancestors, _ := dag.GetAncestors(v5); len(ancestors) != 4 {
+		t.Errorf("2nd time GetAncestors(v5) = %d, want 4", len(ancestors))
+	}
+	v6 := &testVertex{"6"}
+	v7 := &testVertex{"7"}
+	_ = dag.AddEdge(v5, v6)
+	_ = dag.AddEdge(v5, v7)
+	if ancestors, _ := dag.GetAncestors(v6); len(ancestors) != 5 {
+		t.Errorf("GetAncestors(v6) = %d, want 5", len(ancestors))
+	}
+	dag.DeleteVertex(v5)
+	if parents, _ := dag.GetParents(v6); len(parents) != 0 {
+		t.Errorf("GetParents(v6) = %d, want 0", len(parents))
+	}
+	if ancestors, _ := dag.GetAncestors(v6); len(ancestors) != 0 {
+		t.Errorf("GetAncestors(v6) = %d, want 0", len(ancestors))
 	}
 
 }
