@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"github.com/heimdalr/dag"
+	"os"
 )
 
 // data structure that will be used as vertex in the graph
@@ -19,6 +20,8 @@ func main() {
 
 	// initialize a new graph
 	d := dag.NewDAG()
+
+	os.Getenv("goo")
 
 	// init three vertices
 	v1 := &myVertex{"1"}
