@@ -359,19 +359,26 @@ func (d *DAG) GetAncestors(v Vertex) (map[Vertex]bool, error) {
 }
 
 func (d *DAG) getDescendantsAux(v Vertex) map[Vertex]bool {
+	//d.muEdges.Lock()
 	d.descendantsCache[v] = make(map[Vertex]bool)
+	//d.muEdges.Unlock()
 	if children, ok := d.outboundEdge[v]; ok {
 		for child := range children {
-			if _, exists := d.descendantsCache[child]; !exists {
-				d.descendantsCache[child] = d.getDescendantsAux(child)
-			}
-			d.muEdges.Lock()
-			for descendant := range d.descendantsCache[child] {
-				d.descendantsCache[v][descendant] = true
+			go func(child Vertex) {
+				if _, exists := d.descendantsCache[child]; !exists {
+					childDescendants := d.getDescendantsAux(child)
+					d.muEdges.Lock()
+					d.descendantsCache[child] = childDescendants
+					d.muEdges.Unlock()
+				}
+				d.muEdges.Lock()
+				for descendant := range d.descendantsCache[child] {
+					d.descendantsCache[v][descendant] = true
 
-			}
-			d.descendantsCache[v][child] = true
-			d.muEdges.Unlock()
+				}
+				d.descendantsCache[v][child] = true
+				d.muEdges.Unlock()
+			}(child)
 		}
 	}
 	return d.descendantsCache[v]
