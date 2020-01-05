@@ -11,10 +11,6 @@ type Vertex interface {
 	String() string
 }
 
-type cMutex struct {
-	mutex sync.Mutex
-	count int
-}
 
 // The DAG type implements a Directed Acyclic Graph.
 type DAG struct {
@@ -366,24 +362,31 @@ func (d *DAG) GetAncestors(v Vertex) (map[Vertex]bool, error) {
 }
 
 func (d *DAG) getDescendantsAux(v Vertex) map[Vertex]bool {
-	d.descendantsCache[v] = make(map[Vertex]bool)
+	d.lockVertex(v)
+	defer d.unlockVertex(v)
+	if _, exists := d.descendantsCache[v]; exists {
+		return d.descendantsCache[v]
+	}
+	vCache := make(map[Vertex]bool)
 	if children, ok := d.outboundEdge[v]; ok {
+		var waitGroup sync.WaitGroup
+		waitGroup.Add(len(children))
 		for child := range children {
 			go func(child Vertex) {
-				d.lockVertex(child)
 				if _, exists := d.descendantsCache[child]; !exists {
-					d.descendantsCache[child] = d.getDescendantsAux(child)
+					d.getDescendantsAux(child)
 				}
 				for descendant := range d.descendantsCache[child] {
-					d.descendantsCache[v][descendant] = true
-
+					vCache[descendant] = true
 				}
-				d.unlockVertex(child)
-				d.descendantsCache[v][child] = true
+				vCache[child] = true
+				waitGroup.Done()
 			}(child)
 		}
+		waitGroup.Wait()
 	}
-	return d.descendantsCache[v]
+	d.descendantsCache[v] = vCache
+	return vCache
 }
 
 // Return all Descendants of the given vertex.
@@ -395,13 +398,7 @@ func (d *DAG) GetDescendants(v Vertex) (map[Vertex]bool, error) {
 	if _, ok := d.vertices[v]; !ok {
 		return nil, VertexUnknownError{v}
 	}
-
-	d.lockVertex(v)
-	if _, exists := d.descendantsCache[v]; !exists {
-		return d.getDescendantsAux(v), nil
-	}
-	d.unlockVertex(v)
-	return d.descendantsCache[v], nil
+	return d.getDescendantsAux(v), nil
 }
 
 // Return a representation of the graph.
@@ -420,6 +417,15 @@ func (d *DAG) String() string {
 	return result
 }
 
+
+type cMutex struct {
+	mutex sync.Mutex
+	count int
+}
+
+
+
+
 func (d *DAG) lockVertex(v Vertex) {
 
 	// use the muVertices-mutex to flag that we are interested to lock v
@@ -433,11 +439,13 @@ func (d *DAG) lockVertex(v Vertex) {
 	// flag that we are interested in this cMutex (thus now one deletes it)
 	d.verticesLocked[v].count++
 
+	vMutex := d.verticesLocked[v].mutex
+
 	// as the cMutex is there and we have flagged it, we can release the muVertices-mutex
 	d.muVertices.Unlock()
 
 	// and wait on the vertex specific mutex / lock it
-	d.verticesLocked[v].mutex.Lock()
+	vMutex.Lock()
 }
 
 func (d *DAG) unlockVertex(v Vertex) {
