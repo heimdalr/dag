@@ -21,7 +21,6 @@ type DAG struct {
 	verticesLocked   *dMutex
 	ancestorsCache   map[Vertex]map[Vertex]bool
 	descendantsCache map[Vertex]map[Vertex]bool
-
 }
 
 // Creates / initializes a new Directed Acyclic Graph or DAG.
@@ -192,7 +191,6 @@ func (d *DAG) AddEdge(src Vertex, dst Vertex) error {
 		}
 	}
 	delete(d.descendantsCache, src)
-
 
 	d.muDAG.Unlock()
 
@@ -383,22 +381,16 @@ func (d *DAG) getAncestorsAux(v Vertex) map[Vertex]bool {
 	var mu sync.Mutex
 	if parents, ok := d.inboundEdge[v]; ok {
 
-		// for each parent use a goroutine to collect its ancestors
-		var waitGroup sync.WaitGroup
-		waitGroup.Add(len(parents))
+		// for each parent collect its ancestors
 		for parent := range parents {
-			go func(parent Vertex, mu *sync.Mutex, cache map[Vertex]bool) {
-				parentAncestors := d.getAncestorsAux(parent)
-				mu.Lock()
-				for ancestor := range parentAncestors {
-					cache[ancestor] = true
-				}
-				cache[parent] = true
-				mu.Unlock()
-				waitGroup.Done()
-			}(parent, &mu, cache)
+			parentAncestors := d.getAncestorsAux(parent)
+			mu.Lock()
+			for ancestor := range parentAncestors {
+				cache[ancestor] = true
+			}
+			cache[parent] = true
+			mu.Unlock()
 		}
-		waitGroup.Wait()
 	}
 
 	// remember the collected descendents
@@ -424,6 +416,7 @@ func (d *DAG) GetAncestors(v Vertex) (map[Vertex]bool, error) {
 
 	return copyMap(d.getAncestorsAux(v)), nil
 }
+
 func (d *DAG) getDescendantsAux(v Vertex) map[Vertex]bool {
 
 	// in the best case we have already a populated cache
@@ -452,21 +445,21 @@ func (d *DAG) getDescendantsAux(v Vertex) map[Vertex]bool {
 	if children, ok := d.outboundEdge[v]; ok {
 
 		// for each child use a goroutine to collect its descendants
-		var waitGroup sync.WaitGroup
-		waitGroup.Add(len(children))
+		//var waitGroup sync.WaitGroup
+		//waitGroup.Add(len(children))
 		for child := range children {
-			go func(child Vertex, mu *sync.Mutex, cache map[Vertex]bool) {
-				childDescendants := d.getDescendantsAux(child)
-				mu.Lock()
-				for descendant := range childDescendants {
-					cache[descendant] = true
-				}
-				cache[child] = true
-				mu.Unlock()
-				waitGroup.Done()
-			}(child, &mu, cache)
+			//go func(child Vertex, mu *sync.Mutex, cache map[Vertex]bool) {
+			childDescendants := d.getDescendantsAux(child)
+			mu.Lock()
+			for descendant := range childDescendants {
+				cache[descendant] = true
+			}
+			cache[child] = true
+			mu.Unlock()
+			//waitGroup.Done()
+			//}(child, &mu, cache)
 		}
-		waitGroup.Wait()
+		//waitGroup.Wait()
 	}
 
 	// remember the collected descendents
@@ -511,3 +504,138 @@ func (d *DAG) String() string {
 	return result
 }
 
+/***************************
+********** Errors **********
+****************************/
+
+// Error type to describe the situation, that a nil is given instead of a vertex.
+type VertexNilError struct{}
+
+// Implements the error interface.
+func (e VertexNilError) Error() string {
+	return fmt.Sprint("don't know what to do with 'nil'")
+}
+
+// Error type to describe the situation, that a given vertex already exists in the graph.
+type VertexDuplicateError struct {
+	v Vertex
+}
+
+// Implements the error interface.
+func (e VertexDuplicateError) Error() string {
+	return fmt.Sprintf("'%s' is already known", e.v.String())
+}
+
+// Error type to describe the situation, that a given vertex does not exit in the graph.
+type VertexUnknownError struct {
+	v Vertex
+}
+
+// Implements the error interface.
+func (e VertexUnknownError) Error() string {
+	return fmt.Sprintf("'%s' is unknown", e.v.String())
+}
+
+// Error type to describe the situation, that an edge already exists in the graph.
+type EdgeDuplicateError struct {
+	src Vertex
+	dst Vertex
+}
+
+// Implements the error interface.
+func (e EdgeDuplicateError) Error() string {
+	return fmt.Sprintf("edge between '%s' and '%s' is already known", e.src.String(), e.dst.String())
+}
+
+// Error type to describe the situation, that a given edge does not exit in the graph.
+type EdgeUnknownError struct {
+	src Vertex
+	dst Vertex
+}
+
+// Implements the error interface.
+func (e EdgeUnknownError) Error() string {
+	return fmt.Sprintf("edge between '%s' and '%s' is unknown", e.src.String(), e.dst.String())
+}
+
+// Error type to describe loop errors (i.e. errors that where raised to prevent establishing loops in the graph).
+type EdgeLoopError struct {
+	src Vertex
+	dst Vertex
+}
+
+// Implements the error interface.
+func (e EdgeLoopError) Error() string {
+	return fmt.Sprintf("edge between '%s' and '%s' would create a loop", e.src.String(), e.dst.String())
+}
+
+/***************************
+********** dMutex **********
+****************************/
+
+type cMutex struct {
+	mutex sync.Mutex
+	count int
+}
+
+// Structure for dynamic mutexes.
+type dMutex struct {
+	mutexes     map[interface{}]*cMutex
+	globalMutex sync.Mutex
+}
+
+// Initialize a new dynamic mutex structure.
+func newDMutex() *dMutex {
+	return &dMutex{
+		mutexes: make(map[interface{}]*cMutex),
+	}
+}
+
+// Get a lock for instance i
+func (d *dMutex) lock(i interface{}) {
+
+	// acquire global lock
+	d.globalMutex.Lock()
+
+	// if there is no cMutex for i, create it
+	if _, ok := d.mutexes[i]; !ok {
+		d.mutexes[i] = new(cMutex)
+	}
+
+	// increase the count in order to show, that we are interested in this
+	// instance mutex (thus now one deletes it)
+	d.mutexes[i].count++
+
+	// remember the mutex for later
+	mutex := &d.mutexes[i].mutex
+
+	// as the cMutex is there, we have increased the count and we know the
+	// instance mutex, we can release the global lock
+	d.globalMutex.Unlock()
+
+	// and wait on the instance mutex
+	(*mutex).Lock()
+}
+
+// Release the lock for instance i.
+func (d *dMutex) unlock(i interface{}) {
+
+	// acquire global lock
+	d.globalMutex.Lock()
+
+	// unlock instance mutex
+	d.mutexes[i].mutex.Unlock()
+
+	// descrease the count, as we are no longer interested in this instance
+	// mutex
+	d.mutexes[i].count--
+
+	// if we where the last one interested in this instance mutex delete the
+	// cMutex
+	if d.mutexes[i].count == 0 {
+		delete(d.mutexes, i)
+	}
+
+	// release the global lock
+	d.globalMutex.Unlock()
+}
