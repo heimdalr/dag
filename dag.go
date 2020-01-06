@@ -30,7 +30,7 @@ func NewDAG() *DAG {
 		vertices:         make(map[Vertex]bool),
 		inboundEdge:      make(map[Vertex]map[Vertex]bool),
 		outboundEdge:     make(map[Vertex]map[Vertex]bool),
-		verticesLocked:   NewDMutex(),
+		verticesLocked:   newDMutex(),
 		ancestorsCache:   make(map[Vertex]map[Vertex]bool),
 		descendantsCache: make(map[Vertex]map[Vertex]bool),
 	}

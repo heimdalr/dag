@@ -14,7 +14,7 @@ type dMutex struct {
 }
 
 // Initialize a new dynamic mutex structure.
-func NewDMutex() *dMutex {
+func newDMutex() *dMutex {
 	return &dMutex{
 		mutexes: make(map[interface{}]*cMutex),
 	}
