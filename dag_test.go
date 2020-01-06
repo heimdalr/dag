@@ -1,16 +1,18 @@
 package dag
 
 import (
+	"fmt"
 	"testing"
 )
 
-type testVertex struct {
-	Label string
+type myVertex struct {
+	value int
 }
 
-func (v testVertex) String() string {
-	return v.Label
+func (v myVertex) String() string {
+	return fmt.Sprintf("%d", v.value)
 }
+
 
 func TestNewDAG(t *testing.T) {
 	dag := NewDAG()
@@ -26,7 +28,7 @@ func TestDAG_AddVertex(t *testing.T) {
 	dag := NewDAG()
 
 	// add a single vertex and inspect the graph
-	v := &testVertex{"1"}
+	v := &myVertex{1}
 	_ = dag.AddVertex(v)
 	if order := dag.GetOrder(); order != 1 {
 		t.Errorf("GetOrder() = %d, want 1", order)
@@ -70,9 +72,9 @@ func TestDAG_AddVertex(t *testing.T) {
 
 func TestDAG_DeleteVertex(t *testing.T) {
 	dag := NewDAG()
-	v1 := &testVertex{"1"}
-	v2 := &testVertex{"2"}
-	v3 := &testVertex{"3"}
+	v1 := &myVertex{1}
+	v2 := &myVertex{2}
+	v3 := &myVertex{3}
 	_ = dag.AddVertex(v1)
 
 	// delete a single vertex and inspect the graph
@@ -142,7 +144,7 @@ func TestDAG_DeleteVertex(t *testing.T) {
 
 
 	// unknown
-	foo := &testVertex{"foo"}
+	foo := &myVertex{-1}
 	errUnknown := dag.DeleteVertex(foo)
 	if errUnknown == nil {
 		t.Errorf("DeleteVertex(foo) = nil, want %T", VertexUnknownError{foo})
@@ -163,10 +165,10 @@ func TestDAG_DeleteVertex(t *testing.T) {
 
 func TestDAG_AddEdge(t *testing.T) {
 	dag := NewDAG()
-	v0 := &testVertex{"v0"}
-	v1 := &testVertex{"v1"}
-	v2 := &testVertex{"v2"}
-	v3 := &testVertex{"v3"}
+	v0 := &myVertex{0}
+	v1 := &myVertex{1}
+	v2 := &myVertex{2}
+	v3 := &myVertex{3}
 
 	// add a single edge and inspect the graph
 	_ = dag.AddEdge(v1, v2)
@@ -252,66 +254,66 @@ func TestDAG_AddEdge(t *testing.T) {
 
 func TestDAG_DeleteEdge(t *testing.T) {
 	dag := NewDAG()
-	src := &testVertex{"src"}
-	dst := &testVertex{"dst"}
-	_ = dag.AddEdge(src, dst)
+	v0 := &myVertex{0}
+	v1 := &myVertex{1}
+	_ = dag.AddEdge(v0, v1)
 	if size := dag.GetSize(); size != 1 {
 		t.Errorf("GetSize() = %d, want 1", size)
 	}
-	_ = dag.DeleteEdge(src, dst)
+	_ = dag.DeleteEdge(v0, v1)
 	if size := dag.GetSize(); size != 0 {
 		t.Errorf("GetSize() = %d, want 0", size)
 	}
 
 	// unknown
-	errUnknown := dag.DeleteEdge(src, dst)
+	errUnknown := dag.DeleteEdge(v0, v1)
 	if errUnknown == nil {
-		t.Errorf("DeleteEdge(src, dst) = nil, want %T", EdgeUnknownError{})
+		t.Errorf("DeleteEdge(v0, v1) = nil, want %T", EdgeUnknownError{})
 	}
 	if _, ok := errUnknown.(EdgeUnknownError); !ok {
-		t.Errorf("DeleteEdge(src, dst) expected EdgeUnknownError, got %T", errUnknown)
+		t.Errorf("DeleteEdge(v0, v1) expected EdgeUnknownError, got %T", errUnknown)
 	}
 
 	// nil
-	errNilSrc := dag.DeleteEdge(nil, dst)
+	errNilSrc := dag.DeleteEdge(nil, v1)
 	if errNilSrc == nil {
-		t.Errorf("DeleteEdge(nil, dst) = nil, want %T", VertexNilError{})
+		t.Errorf("DeleteEdge(nil, v1) = nil, want %T", VertexNilError{})
 	}
 	if _, ok := errNilSrc.(VertexNilError); !ok {
-		t.Errorf("DeleteEdge(nil, dst) expected VertexNilError, got %T", errNilSrc)
+		t.Errorf("DeleteEdge(nil, v1) expected VertexNilError, got %T", errNilSrc)
 	}
-	errNilDst := dag.DeleteEdge(src, nil)
+	errNilDst := dag.DeleteEdge(v0, nil)
 	if errNilDst == nil {
-		t.Errorf("DeleteEdge(src, nil) = nil, want %T", VertexNilError{})
+		t.Errorf("DeleteEdge(v0, nil) = nil, want %T", VertexNilError{})
 	}
 	if _, ok := errNilDst.(VertexNilError); !ok {
-		t.Errorf("DeleteEdge(src, nil) expected VertexNilError, got %T", errNilDst)
+		t.Errorf("DeleteEdge(v0, nil) expected VertexNilError, got %T", errNilDst)
 	}
 	
 	// unknown
-	foo := &testVertex{"foo"}
-	errUnknownSrc := dag.DeleteEdge(foo, dst)
+	foo := &myVertex{-1}
+	errUnknownSrc := dag.DeleteEdge(foo, v1)
 	if errUnknownSrc == nil {
-		t.Errorf("DeleteEdge(foo, dst) = nil, want %T", VertexUnknownError{})
+		t.Errorf("DeleteEdge(foo, v1) = nil, want %T", VertexUnknownError{})
 	}
 	if _, ok := errUnknownSrc.(VertexUnknownError); !ok {
-		t.Errorf("DeleteEdge(foo, dst) expected VertexUnknownError, got %T", errUnknownSrc)
+		t.Errorf("DeleteEdge(foo, v1) expected VertexUnknownError, got %T", errUnknownSrc)
 	}
-	errUnknownDst := dag.DeleteEdge(src, foo)
+	errUnknownDst := dag.DeleteEdge(v0, foo)
 	if errUnknownDst == nil {
-		t.Errorf("DeleteEdge(src, foo) = nil, want %T", VertexUnknownError{})
+		t.Errorf("DeleteEdge(v0, foo) = nil, want %T", VertexUnknownError{})
 	}
 	if _, ok := errUnknownDst.(VertexUnknownError); !ok {
-		t.Errorf("DeleteEdge(src, foo) expected VertexUnknownError, got %T", errUnknownDst)
+		t.Errorf("DeleteEdge(v0, foo) expected VertexUnknownError, got %T", errUnknownDst)
 	}
 }
 
 func TestDAG_GetChildren(t *testing.T) {
 	dag := NewDAG()
-	v1 := &testVertex{"1"}
-	v2 := &testVertex{"2"}
-	v3 := &testVertex{"3"}
-	v4 := &testVertex{"4"}
+	v1 := &myVertex{1}
+	v2 := &myVertex{2}
+	v3 := &myVertex{3}
+	v4 := &myVertex{4}
 	_ = dag.AddEdge(v1, v2)
 	_ = dag.AddEdge(v1, v3)
 
@@ -347,10 +349,10 @@ func TestDAG_GetChildren(t *testing.T) {
 
 func TestDAG_GetParents(t *testing.T) {
 	dag := NewDAG()
-	v1 := &testVertex{"1"}
-	v2 := &testVertex{"2"}
-	v3 := &testVertex{"3"}
-	v4 := &testVertex{"4"}
+	v1 := &myVertex{1}
+	v2 := &myVertex{2}
+	v3 := &myVertex{3}
+	v4 := &myVertex{4}
 	_ = dag.AddEdge(v1, v3)
 	_ = dag.AddEdge(v2, v3)
 
@@ -387,11 +389,11 @@ func TestDAG_GetParents(t *testing.T) {
 
 func TestDAG_GetDescendants(t *testing.T) {
 	dag := NewDAG()
-	v1 := &testVertex{"1"}
-	v2 := &testVertex{"2"}
-	v3 := &testVertex{"3"}
-	v4 := &testVertex{"4"}
-	v5 := &testVertex{"5"}
+	v1 := &myVertex{1}
+	v2 := &myVertex{2}
+	v3 := &myVertex{3}
+	v4 := &myVertex{4}
+	v5 := &myVertex{5}
 	_ = dag.AddEdge(v1, v2)
 	_ = dag.AddEdge(v2, v3)
 	_ = dag.AddEdge(v2, v4)
@@ -430,14 +432,14 @@ func TestDAG_GetDescendants(t *testing.T) {
 
 func TestDAG_GetAncestors(t *testing.T) {
 	dag := NewDAG()
-	v0 := &testVertex{"0"}
-	v1 := &testVertex{"1"}
-	v2 := &testVertex{"2"}
-	v3 := &testVertex{"3"}
-	v4 := &testVertex{"4"}
-	v5 := &testVertex{"5"}
-	v6 := &testVertex{"6"}
-	v7 := &testVertex{"7"}
+	v0 := &myVertex{0}
+	v1 := &myVertex{1}
+	v2 := &myVertex{2}
+	v3 := &myVertex{3}
+	v4 := &myVertex{4}
+	v5 := &myVertex{5}
+	v6 := &myVertex{6}
+	v7 := &myVertex{7}
 
 	_ = dag.AddEdge(v1, v2)
 	_ = dag.AddEdge(v2, v3)
@@ -488,7 +490,7 @@ func TestDAG_GetAncestors(t *testing.T) {
 	}
 
 	// unknown
-	foo := &testVertex{"foo"}
+	foo := &myVertex{-1}
 	_, errUnknown := dag.GetAncestors(foo)
 	if errUnknown == nil {
 		t.Errorf("GetAncestors(foo) = nil, want %T", VertexUnknownError{foo})
@@ -501,10 +503,10 @@ func TestDAG_GetAncestors(t *testing.T) {
 
 func TestDAG_String(t *testing.T) {
 	dag := NewDAG()
-	v1 := &testVertex{"1"}
-	v2 := &testVertex{"2"}
-	v3 := &testVertex{"3"}
-	v4 := &testVertex{"4"}
+	v1 := &myVertex{1}
+	v2 := &myVertex{2}
+	v3 := &myVertex{3}
+	v4 := &myVertex{4}
 	_ = dag.AddEdge(v1, v2)
 	_ = dag.AddEdge(v2, v3)
 	_ = dag.AddEdge(v2, v4)
@@ -515,3 +517,116 @@ func TestDAG_String(t *testing.T) {
 	}
 }
 
+func TestErrors(t *testing.T) {
+	v1 := &myVertex{1}
+	v2 := &myVertex{2}
+
+	tests := []struct {
+		want string
+		err error
+	}{
+		{"don't know what to do with 'nil'", VertexNilError{}},
+		{"'1' is already known", VertexDuplicateError{v1}},
+		{"'1' is unknown", VertexUnknownError{v1}},
+		{"edge between '1' and '2' is already known", EdgeDuplicateError{v1, v2}},
+		{"edge between '1' and '2' is unknown", EdgeUnknownError{v1, v2}},
+		{"edge between '1' and '2' would create a loop", EdgeLoopError{v1, v2}},
+	}
+	for _, tt := range tests {
+		t.Run(fmt.Sprintf("%T", tt.err), func(t *testing.T) {
+			if got := tt.err.Error(); got != tt.want {
+				t.Errorf("Error() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func Example() {
+
+	// initialize a new graph
+	d := NewDAG()
+
+	// init three vertices
+	v1 := &myVertex{1}
+	v2 := &myVertex{2}
+	v3 := &myVertex{3}
+
+	// add the above vertices and connect them with two edges
+	_ = d.AddEdge(v1, v2)
+	_ = d.AddEdge(v1, v3)
+
+	// describe the graph
+	fmt.Print(d.String())
+
+	// Unordered output:
+	// DAG Vertices: 3 - Edges: 2
+	// Vertices:
+	//   2
+	//   3
+	//   1
+	// Edges:
+	//   1 -> 2
+	//   1 -> 3
+}
+
+func TestLarge(t *testing.T) {
+	d := NewDAG()
+	root := &myVertex{1}
+	levels := 7
+	branches := 8
+
+	expectedVertexCount, _ := largeAux(d, levels, branches, root)
+	expectedVertexCount++
+	vertexCount := len(d.GetVertices())
+	if vertexCount != expectedVertexCount {
+		t.Errorf("GetVertices() = %d, want %d", vertexCount, expectedVertexCount)
+	}
+
+	descendants, _ := d.GetDescendants(root)
+	descendantsCount := len(descendants)
+	expectedDescendantsCount := vertexCount - 1
+	if descendantsCount != expectedDescendantsCount {
+		t.Errorf("GetDescendants(root) = %d, want %d", descendantsCount, expectedDescendantsCount)
+	}
+
+	descendants, _ = d.GetDescendants(root)
+
+	children, _ := d.GetChildren(root)
+	childrenCount := len(children)
+	expectedChildrenCount := branches
+	if childrenCount != expectedChildrenCount {
+		t.Errorf("GetChildren(root) = %d, want %d", childrenCount, expectedChildrenCount)
+	}
+
+	/*
+	var childList []Vertex
+	for x := range children {
+		childList = append(childList, x)
+	}
+	_ = d.DeleteEdge(root, childList[0])
+	 */
+}
+
+func largeAux(d *DAG, level int, branches int, parent *myVertex) (int, int) {
+	var vertexCount int
+	var edgeCount int
+	if level > 1 {
+		if branches < 1 || branches > 9 {
+			panic("number of branches must be between 1 and 9")
+		}
+		for i := 1; i <= branches; i++ {
+			value := (*parent).value*10 + i
+			child := &myVertex{value}
+			vertexCount++
+			err := d.AddEdge(parent, child)
+			edgeCount++
+			if err != nil {
+				panic(err)
+			}
+			childVertexCount, childEdgeCount := largeAux(d, level-1, branches, child)
+			vertexCount += childVertexCount
+			edgeCount += childEdgeCount
+		}
+	}
+	return vertexCount, edgeCount
+}

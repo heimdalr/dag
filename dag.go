@@ -18,7 +18,7 @@ type DAG struct {
 	inboundEdge      map[Vertex]map[Vertex]bool
 	outboundEdge     map[Vertex]map[Vertex]bool
 	muCache          sync.RWMutex
-	verticesLocked   *DMutex
+	verticesLocked   *dMutex
 	ancestorsCache   map[Vertex]map[Vertex]bool
 	descendantsCache map[Vertex]map[Vertex]bool
 
@@ -367,8 +367,8 @@ func (d *DAG) getAncestorsAux(v Vertex) map[Vertex]bool {
 	}
 
 	// lock this vertex to work on it exclusively
-	d.verticesLocked.Lock(v)
-	defer d.verticesLocked.Unlock(v)
+	d.verticesLocked.lock(v)
+	defer d.verticesLocked.unlock(v)
 
 	// now as we have locked this vertex, check (again) that no one has meanwhile populated the cache
 	d.muCache.RLock()
@@ -435,8 +435,8 @@ func (d *DAG) getDescendantsAux(v Vertex) map[Vertex]bool {
 	}
 
 	// lock this vertex to work on it exclusively
-	d.verticesLocked.Lock(v)
-	defer d.verticesLocked.Unlock(v)
+	d.verticesLocked.lock(v)
+	defer d.verticesLocked.unlock(v)
 
 	// now as we have locked this vertex, check (again) that no one has meanwhile populated the cache
 	d.muCache.RLock()

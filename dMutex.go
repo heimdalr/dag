@@ -8,19 +8,20 @@ type cMutex struct {
 }
 
 // Structure for dynamic mutexes.
-type DMutex struct {
+type dMutex struct {
 	mutexes     map[interface{}]*cMutex
 	globalMutex sync.Mutex
 }
 
 // Initialize a new dynamic mutex structure.
-func NewDMutex() *DMutex {
-	return &DMutex{
+func NewDMutex() *dMutex {
+	return &dMutex{
 		mutexes: make(map[interface{}]*cMutex),
 	}
 }
 
-func (d *DMutex) Lock(i interface{}) {
+// Get a lock for instance i
+func (d *dMutex) lock(i interface{}) {
 
 	// acquire global lock
 	d.globalMutex.Lock()
@@ -45,7 +46,8 @@ func (d *DMutex) Lock(i interface{}) {
 	(*mutex).Lock()
 }
 
-func (d *DMutex) Unlock(i interface{}) {
+// Release the lock for instance i.
+func (d *dMutex) unlock(i interface{}) {
 
 	// acquire global lock
 	d.globalMutex.Lock()
