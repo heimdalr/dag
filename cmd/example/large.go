@@ -25,7 +25,7 @@ func main() {
 	start = time.Now()
 	largeAux(d, levels, branches, root)
 	end = time.Now()
-	fmt.Printf("%fs to add edges\n", end.Sub(start).Seconds())
+	fmt.Printf("%fs to add %d vertices and %d edges\n", end.Sub(start).Seconds(), d.GetOrder(), d.GetSize())
 	expectedVertexCount := sum(0, levels - 1 , branches, pow)
 	vertexCount := len(d.GetVertices())
 	if vertexCount != expectedVertexCount {

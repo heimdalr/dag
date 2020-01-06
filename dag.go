@@ -11,27 +11,27 @@ type Vertex interface {
 	String() string
 }
 
-
 // The DAG type implements a Directed Acyclic Graph.
 type DAG struct {
+	muDAG            sync.RWMutex
 	vertices         map[Vertex]bool
-	verticesLocked   map[Vertex]*cMutex
-	muVertices       sync.Mutex
 	inboundEdge      map[Vertex]map[Vertex]bool
 	outboundEdge     map[Vertex]map[Vertex]bool
-	ancestorCache    map[Vertex]map[Vertex]bool
+	muCache          sync.RWMutex
+	verticesLocked   *DMutex
+	ancestorsCache   map[Vertex]map[Vertex]bool
 	descendantsCache map[Vertex]map[Vertex]bool
-	muEdges          sync.Mutex
+
 }
 
 // Creates / initializes a new Directed Acyclic Graph or DAG.
 func NewDAG() *DAG {
 	return &DAG{
 		vertices:         make(map[Vertex]bool),
-		verticesLocked:   make(map[Vertex]*cMutex),
 		inboundEdge:      make(map[Vertex]map[Vertex]bool),
 		outboundEdge:     make(map[Vertex]map[Vertex]bool),
-		ancestorCache:    make(map[Vertex]map[Vertex]bool),
+		verticesLocked:   NewDMutex(),
+		ancestorsCache:   make(map[Vertex]map[Vertex]bool),
 		descendantsCache: make(map[Vertex]map[Vertex]bool),
 	}
 }
@@ -44,13 +44,16 @@ func (d *DAG) AddVertex(v Vertex) error {
 	if v == nil {
 		return VertexNilError{}
 	}
-	if _, exists := d.vertices[v]; exists {
+	d.muDAG.RLock()
+	_, exists := d.vertices[v]
+	d.muDAG.RUnlock()
+	if exists {
 		return VertexDuplicateError{v}
 	}
 
-	d.muVertices.Lock()
+	d.muDAG.Lock()
 	d.vertices[v] = true
-	d.muVertices.Unlock()
+	d.muDAG.Unlock()
 
 	return nil
 }
@@ -63,7 +66,10 @@ func (d *DAG) DeleteVertex(v Vertex) error {
 	if v == nil {
 		return VertexNilError{}
 	}
-	if _, exists := d.vertices[v]; !exists {
+	d.muDAG.RLock()
+	_, exists := d.vertices[v]
+	d.muDAG.RUnlock()
+	if !exists {
 		return VertexUnknownError{v}
 	}
 
@@ -71,7 +77,7 @@ func (d *DAG) DeleteVertex(v Vertex) error {
 	descendants, _ := d.GetDescendants(v)
 	ancestors, _ := d.GetAncestors(v)
 
-	d.muEdges.Lock()
+	d.muDAG.Lock()
 
 	// delete v in outbound edges of parents
 	if _, exists := d.inboundEdge[v]; exists {
@@ -93,11 +99,11 @@ func (d *DAG) DeleteVertex(v Vertex) error {
 
 	// for v and all its descendants delete cached ancestors
 	for descendant := range descendants {
-		if _, exists := d.ancestorCache[descendant]; exists {
-			delete(d.ancestorCache, descendant)
+		if _, exists := d.ancestorsCache[descendant]; exists {
+			delete(d.ancestorsCache, descendant)
 		}
 	}
-	delete(d.ancestorCache, v)
+	delete(d.ancestorsCache, v)
 
 	// for v and all its ancestors delete cached descendants
 	for ancestor := range ancestors {
@@ -107,14 +113,10 @@ func (d *DAG) DeleteVertex(v Vertex) error {
 	}
 	delete(d.descendantsCache, v)
 
-	d.muEdges.Unlock()
-
-	d.muVertices.Lock()
-
 	// delete v itself
 	delete(d.vertices, v)
 
-	d.muVertices.Unlock()
+	d.muDAG.Unlock()
 
 	return nil
 }
@@ -131,17 +133,20 @@ func (d *DAG) AddEdge(src Vertex, dst Vertex) error {
 	}
 
 	// ensure vertices
-	d.muVertices.Lock()
+	d.muDAG.Lock()
 	d.vertices[src] = true
 	d.vertices[dst] = true
-	d.muVertices.Unlock()
+	d.muDAG.Unlock()
 
-	// test / compute edge nodes
+	// test / compute edge nodes and the edge itself
+	d.muDAG.RLock()
 	_, outboundExists := d.outboundEdge[src]
 	_, inboundExists := d.inboundEdge[dst]
+	edgeKnown := outboundExists && d.outboundEdge[src][dst] && inboundExists && d.inboundEdge[dst][src]
+	d.muDAG.RUnlock()
 
 	// if the edge is already known, there is nothing else to do
-	if outboundExists && d.outboundEdge[src][dst] && inboundExists && d.inboundEdge[dst][src] {
+	if edgeKnown {
 		return EdgeDuplicateError{src, dst}
 	}
 
@@ -154,7 +159,7 @@ func (d *DAG) AddEdge(src Vertex, dst Vertex) error {
 		return EdgeLoopError{src, dst}
 	}
 
-	d.muEdges.Lock()
+	d.muDAG.Lock()
 
 	// prepare d.outbound[src], iff needed
 	if !outboundExists {
@@ -174,11 +179,11 @@ func (d *DAG) AddEdge(src Vertex, dst Vertex) error {
 
 	// for dst and all its descendants delete cached ancestors
 	for descendant := range descendants {
-		if _, exists := d.ancestorCache[descendant]; exists {
-			delete(d.ancestorCache, descendant)
+		if _, exists := d.ancestorsCache[descendant]; exists {
+			delete(d.ancestorsCache, descendant)
 		}
 	}
-	delete(d.ancestorCache, dst)
+	delete(d.ancestorsCache, dst)
 
 	// for src and all its ancestors delete cached descendants
 	for ancestor := range ancestors {
@@ -189,7 +194,7 @@ func (d *DAG) AddEdge(src Vertex, dst Vertex) error {
 	delete(d.descendantsCache, src)
 
 
-	d.muEdges.Unlock()
+	d.muDAG.Unlock()
 
 	return nil
 }
@@ -204,6 +209,8 @@ func (d *DAG) DeleteEdge(src Vertex, dst Vertex) error {
 	if dst == nil {
 		return VertexNilError{}
 	}
+
+	d.muDAG.RLock()
 	if _, ok := d.vertices[src]; !ok {
 		return VertexUnknownError{src}
 	}
@@ -214,6 +221,7 @@ func (d *DAG) DeleteEdge(src Vertex, dst Vertex) error {
 	// test / compute edge nodes
 	_, outboundExists := d.outboundEdge[src][dst]
 	_, inboundExists := d.inboundEdge[dst][src]
+	d.muDAG.RUnlock()
 
 	if !inboundExists || !outboundExists {
 		return EdgeUnknownError{src, dst}
@@ -223,7 +231,7 @@ func (d *DAG) DeleteEdge(src Vertex, dst Vertex) error {
 	descendants, _ := d.GetDescendants(src)
 	ancestors, _ := d.GetAncestors(dst)
 
-	d.muEdges.Lock()
+	d.muDAG.Lock()
 
 	// delete outbound
 	if outboundExists {
@@ -237,11 +245,11 @@ func (d *DAG) DeleteEdge(src Vertex, dst Vertex) error {
 
 	// for src and all its descendants delete cached ancestors
 	for descendant := range descendants {
-		if _, exists := d.ancestorCache[descendant]; exists {
-			delete(d.ancestorCache, descendant)
+		if _, exists := d.ancestorsCache[descendant]; exists {
+			delete(d.ancestorsCache, descendant)
 		}
 	}
-	delete(d.ancestorCache, src)
+	delete(d.ancestorsCache, src)
 
 	// for dst and all its ancestors delete cached descendants
 	for ancestor := range ancestors {
@@ -251,52 +259,70 @@ func (d *DAG) DeleteEdge(src Vertex, dst Vertex) error {
 	}
 	delete(d.descendantsCache, dst)
 
-	d.muEdges.Unlock()
+	d.muDAG.Unlock()
 
 	return nil
 }
 
 // Return the total number of vertices.
 func (d *DAG) GetOrder() int {
+	d.muDAG.RLock()
+	defer d.muDAG.RUnlock()
 	return len(d.vertices)
 }
 
 // Return the total number of edges.
 func (d *DAG) GetSize() int {
 	count := 0
+	d.muDAG.RLock()
 	for _, value := range d.outboundEdge {
 		count += len(value)
 	}
+	d.muDAG.RUnlock()
 	return count
 }
 
 // Return all vertices without children.
 func (d *DAG) GetLeafs() map[Vertex]bool {
 	leafs := make(map[Vertex]bool)
+	d.muDAG.RLock()
 	for v := range d.vertices {
 		dstIds, ok := d.outboundEdge[v]
 		if !ok || len(dstIds) == 0 {
 			leafs[v] = true
 		}
 	}
+	d.muDAG.RUnlock()
 	return leafs
 }
 
 // Return all vertices without parents.
 func (d *DAG) GetRoots() map[Vertex]bool {
 	roots := make(map[Vertex]bool)
+	d.muDAG.RLock()
 	for v := range d.vertices {
 		srcIds, ok := d.inboundEdge[v]
 		if !ok || len(srcIds) == 0 {
 			roots[v] = true
 		}
 	}
+	d.muDAG.RUnlock()
 	return roots
+}
+
+func copyMap(in map[Vertex]bool) map[Vertex]bool {
+	out := make(map[Vertex]bool)
+	for key, value := range in {
+		out[key] = value
+	}
+	return out
 }
 
 // Return all vertices.
 func (d *DAG) GetVertices() map[Vertex]bool {
-	return d.vertices
+	d.muDAG.RLock()
+	defer d.muDAG.RUnlock()
+	return copyMap(d.vertices)
 }
 
 // Return all children of the given vertex.
@@ -306,11 +332,13 @@ func (d *DAG) GetChildren(v Vertex) (map[Vertex]bool, error) {
 	if v == nil {
 		return nil, VertexNilError{}
 	}
+	d.muDAG.RLock()
+	defer d.muDAG.RUnlock()
 	if _, ok := d.vertices[v]; !ok {
 		return nil, VertexUnknownError{v}
 	}
 
-	return d.outboundEdge[v], nil
+	return copyMap(d.outboundEdge[v]), nil
 }
 
 // Return all parents of the given vertex.
@@ -319,92 +347,157 @@ func (d *DAG) GetParents(v Vertex) (map[Vertex]bool, error) {
 	if v == nil {
 		return nil, VertexNilError{}
 	}
+	d.muDAG.RLock()
+	defer d.muDAG.RUnlock()
 	if _, ok := d.vertices[v]; !ok {
 		return nil, VertexUnknownError{v}
 	}
 
-	return d.inboundEdge[v], nil
+	return copyMap(d.inboundEdge[v]), nil
 }
 
 func (d *DAG) getAncestorsAux(v Vertex) map[Vertex]bool {
-	d.ancestorCache[v] = make(map[Vertex]bool)
-	if parents, ok := d.inboundEdge[v]; ok {
-		for parent := range parents {
-			if _, exists := d.ancestorCache[parent]; !exists {
-				d.ancestorCache[parent] = d.getAncestorsAux(parent)
-			}
-			d.muEdges.Lock()
-			for ancestor := range d.ancestorCache[parent] {
-				d.ancestorCache[v][ancestor] = true
 
-			}
-			d.ancestorCache[v][parent] = true
-			d.muEdges.Unlock()
-		}
+	// in the best case we have already a populated cache
+	d.muCache.RLock()
+	cache, exists := d.ancestorsCache[v]
+	d.muCache.RUnlock()
+	if exists {
+		return cache
 	}
-	return d.ancestorCache[v]
+
+	// lock this vertex to work on it exclusively
+	d.verticesLocked.Lock(v)
+	defer d.verticesLocked.Unlock(v)
+
+	// now as we have locked this vertex, check (again) that no one has meanwhile populated the cache
+	d.muCache.RLock()
+	cache, exists = d.ancestorsCache[v]
+	d.muCache.RUnlock()
+	if exists {
+		return cache
+	}
+
+	// as there is no cache, we start from scratch and first of all collect all ancestors locally
+	cache = make(map[Vertex]bool)
+	var mu sync.Mutex
+	if parents, ok := d.inboundEdge[v]; ok {
+
+		// for each parent use a goroutine to collect its ancestors
+		var waitGroup sync.WaitGroup
+		waitGroup.Add(len(parents))
+		for parent := range parents {
+			go func(parent Vertex, mu *sync.Mutex, cache map[Vertex]bool) {
+				parentAncestors := d.getAncestorsAux(parent)
+				mu.Lock()
+				for ancestor := range parentAncestors {
+					cache[ancestor] = true
+				}
+				cache[parent] = true
+				mu.Unlock()
+				waitGroup.Done()
+			}(parent, &mu, cache)
+		}
+		waitGroup.Wait()
+	}
+
+	// remember the collected descendents
+	d.muCache.Lock()
+	d.ancestorsCache[v] = cache
+	d.muCache.Unlock()
+	return cache
 }
 
 // Return all Ancestors of the given vertex.
 func (d *DAG) GetAncestors(v Vertex) (map[Vertex]bool, error) {
+
 	// sanity checking
 	if v == nil {
 		return nil, VertexNilError{}
 	}
-	if _, ok := d.vertices[v]; !ok {
+	d.muDAG.RLock()
+	_, ok := d.vertices[v]
+	d.muDAG.RUnlock()
+	if !ok {
 		return nil, VertexUnknownError{v}
 	}
 
-	if _, exists := d.ancestorCache[v]; !exists {
-		return d.getAncestorsAux(v), nil
-	}
-	return d.ancestorCache[v], nil
+	return copyMap(d.getAncestorsAux(v)), nil
 }
-
 func (d *DAG) getDescendantsAux(v Vertex) map[Vertex]bool {
-	d.lockVertex(v)
-	defer d.unlockVertex(v)
-	if _, exists := d.descendantsCache[v]; exists {
-		return d.descendantsCache[v]
+
+	// in the best case we have already a populated cache
+	d.muCache.RLock()
+	cache, exists := d.descendantsCache[v]
+	d.muCache.RUnlock()
+	if exists {
+		return cache
 	}
-	vCache := make(map[Vertex]bool)
+
+	// lock this vertex to work on it exclusively
+	d.verticesLocked.Lock(v)
+	defer d.verticesLocked.Unlock(v)
+
+	// now as we have locked this vertex, check (again) that no one has meanwhile populated the cache
+	d.muCache.RLock()
+	cache, exists = d.descendantsCache[v]
+	d.muCache.RUnlock()
+	if exists {
+		return cache
+	}
+
+	// as there is no cache, we start from scratch and first of all collect all descendants locally
+	cache = make(map[Vertex]bool)
+	var mu sync.Mutex
 	if children, ok := d.outboundEdge[v]; ok {
+
+		// for each child use a goroutine to collect its descendants
 		var waitGroup sync.WaitGroup
 		waitGroup.Add(len(children))
 		for child := range children {
-			go func(child Vertex) {
-				if _, exists := d.descendantsCache[child]; !exists {
-					d.getDescendantsAux(child)
+			go func(child Vertex, mu *sync.Mutex, cache map[Vertex]bool) {
+				childDescendants := d.getDescendantsAux(child)
+				mu.Lock()
+				for descendant := range childDescendants {
+					cache[descendant] = true
 				}
-				for descendant := range d.descendantsCache[child] {
-					vCache[descendant] = true
-				}
-				vCache[child] = true
+				cache[child] = true
+				mu.Unlock()
 				waitGroup.Done()
-			}(child)
+			}(child, &mu, cache)
 		}
 		waitGroup.Wait()
 	}
-	d.descendantsCache[v] = vCache
-	return vCache
+
+	// remember the collected descendents
+	d.muCache.Lock()
+	d.descendantsCache[v] = cache
+	d.muCache.Unlock()
+	return cache
 }
 
 // Return all Descendants of the given vertex.
 func (d *DAG) GetDescendants(v Vertex) (map[Vertex]bool, error) {
+
 	// sanity checking
 	if v == nil {
 		return nil, VertexNilError{}
 	}
-	if _, ok := d.vertices[v]; !ok {
+	d.muDAG.RLock()
+	_, ok := d.vertices[v]
+	d.muDAG.RUnlock()
+	if !ok {
 		return nil, VertexUnknownError{v}
 	}
-	return d.getDescendantsAux(v), nil
+
+	return copyMap(d.getDescendantsAux(v)), nil
 }
 
 // Return a representation of the graph.
 func (d *DAG) String() string {
 	result := fmt.Sprintf("DAG Vertices: %d - Edges: %d\n", d.GetOrder(), d.GetSize())
 	result += fmt.Sprintf("Vertices:\n")
+	d.muDAG.RLock()
 	for k := range d.vertices {
 		result += fmt.Sprintf("  %v\n", k.String())
 	}
@@ -414,56 +507,7 @@ func (d *DAG) String() string {
 			result += fmt.Sprintf("  %s -> %s\n", v.String(), child.String())
 		}
 	}
+	d.muDAG.RUnlock()
 	return result
 }
 
-
-type cMutex struct {
-	mutex sync.Mutex
-	count int
-}
-
-
-
-
-func (d *DAG) lockVertex(v Vertex) {
-
-	// use the muVertices-mutex to flag that we are interested to lock v
-	d.muVertices.Lock()
-
-	// if there is no cMutex for v, create it
-	if _, ok := d.verticesLocked[v]; !ok {
-		d.verticesLocked[v] = new(cMutex)
-	}
-
-	// flag that we are interested in this cMutex (thus now one deletes it)
-	d.verticesLocked[v].count++
-
-	vMutex := d.verticesLocked[v].mutex
-
-	// as the cMutex is there and we have flagged it, we can release the muVertices-mutex
-	d.muVertices.Unlock()
-
-	// and wait on the vertex specific mutex / lock it
-	vMutex.Lock()
-}
-
-func (d *DAG) unlockVertex(v Vertex) {
-
-	// use the muVertices-mutex to flag that we we want to release the lock for v
-	d.muVertices.Lock()
-
-	// unlock
-	d.verticesLocked[v].mutex.Unlock()
-
-	// only if the unlock succeeded, reduce the count
-	d.verticesLocked[v].count--
-
-	// if we where the last one interested in this cMutex
-	if d.verticesLocked[v].count == 0 {
-		delete(d.verticesLocked, v)
-	}
-
-	// release the muVertices-mutex
-	d.muVertices.Unlock()
-}
