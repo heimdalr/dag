@@ -43,6 +43,16 @@ func main() {
 	}
 
 	start = time.Now()
+	descendantsOrdered, _ := d.GetOrderedDescendants(root)
+	end = time.Now()
+	fmt.Printf("%fs to get descendants ordered\n", end.Sub(start).Seconds())
+	descendantsOrderedCount := len(descendantsOrdered)
+	if descendantsOrderedCount != expectedDescendantsCount {
+		panic(fmt.Sprintf("GetOrderedDescendants(root) = %d, want %d", descendantsOrderedCount, expectedDescendantsCount))
+	}
+
+
+	start = time.Now()
 	descendants, _ = d.GetDescendants(root)
 	end = time.Now()
 	fmt.Printf("%fs to get descendants 2nd time\n", end.Sub(start).Seconds())

@@ -417,6 +417,72 @@ func (d *DAG) GetAncestors(v Vertex) (map[Vertex]bool, error) {
 	return copyMap(d.getAncestorsAux(v)), nil
 }
 
+func (d *DAG) getOrderedAncestorsAux(v Vertex) []Vertex {
+	parents := make([]Vertex, 0, len(d.inboundEdge[v]))
+	for parent := range d.inboundEdge[v] {
+		parents = append(parents, parent)
+	}
+	for _, parent := range parents {
+		parents = append(parents, d.getOrderedAncestorsAux(parent)...)
+	}
+	return parents
+}
+
+// GetOrderedAncestors returns all ancestors of a vertex in a breath first order
+func (d *DAG) GetOrderedAncestors(v Vertex) ([]Vertex, error) {
+
+	// sanity checking
+	if v == nil {
+		return nil, VertexNilError{}
+	}
+	d.muDAG.RLock()
+	defer d.muDAG.RUnlock()
+	if _, ok := d.vertices[v]; !ok {
+		return nil, VertexUnknownError{v}
+	}
+	return d.getOrderedAncestorsAux(v), nil
+}
+
+func(d *DAG) walkAncestorsAux(v Vertex, vertices chan Vertex, signal <-chan bool) bool {
+	parents := make([]Vertex, 0, len(d.inboundEdge[v]))
+	for parent := range d.inboundEdge[v] {
+		select {
+			case <-signal:
+				return true
+			default:
+				parents = append(parents, parent)
+				vertices <- parent
+		}
+	}
+	for _, parent := range parents {
+		if d.walkAncestorsAux(parent, vertices, signal) {
+			return true
+		}
+	}
+	return false
+}
+
+// AncestorsWalker returns a channel and subsequently returns / walks all ancestors of a vertex in a breath first order.
+func(d *DAG) AncestorsWalker(v Vertex, signal <-chan bool) (<-chan Vertex, error) {
+	// sanity checking
+	if v == nil {
+		return nil, VertexNilError{}
+	}
+	d.muDAG.RLock()
+	if _, ok := d.vertices[v]; !ok {
+		return nil, VertexUnknownError{v}
+	}
+	d.muDAG.RUnlock()
+	vertices := make(chan Vertex)
+	go func() {
+		d.muDAG.RLock()
+		d.walkAncestorsAux(v, vertices, signal)
+		d.muDAG.RUnlock()
+		close(vertices)
+	}()
+	return vertices, nil
+}
+
 func (d *DAG) getDescendantsAux(v Vertex) map[Vertex]bool {
 
 	// in the best case we have already a populated cache
@@ -484,6 +550,32 @@ func (d *DAG) GetDescendants(v Vertex) (map[Vertex]bool, error) {
 	}
 
 	return copyMap(d.getDescendantsAux(v)), nil
+}
+
+func (d *DAG) getOrderedDescendantsAux(v Vertex) []Vertex {
+	children := make([]Vertex, 0, len(d.outboundEdge[v]))
+	for child := range d.outboundEdge[v] {
+		children = append(children, child)
+	}
+	for _, child := range children {
+		children = append(children, d.getOrderedDescendantsAux(child)...)
+	}
+	return children
+}
+
+// GetOrderedDescendants returns all descendents of a vertex in a breath first order
+func (d *DAG) GetOrderedDescendants(v Vertex) ([]Vertex, error) {
+
+	// sanity checking
+	if v == nil {
+		return nil, VertexNilError{}
+	}
+	d.muDAG.RLock()
+	defer d.muDAG.RUnlock()
+	if _, ok := d.vertices[v]; !ok {
+		return nil, VertexUnknownError{v}
+	}
+	return d.getOrderedDescendantsAux(v), nil
 }
 
 // Return a representation of the graph.
