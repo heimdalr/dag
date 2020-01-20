@@ -487,6 +487,7 @@ func (d *DAG) AncestorsWalker(v Vertex) (chan Vertex, chan bool, error) {
 		d.walkAncestors(v, vertices, signal)
 		d.muDAG.RUnlock()
 		close(vertices)
+		close(signal)
 	}()
 	return vertices, signal, nil
 }
@@ -630,6 +631,7 @@ func (d *DAG) DescendantsWalker(v Vertex) (chan Vertex, chan bool, error) {
 		d.walkDescendants(v, vertices, signal)
 		d.muDAG.RUnlock()
 		close(vertices)
+		close(signal)
 	}()
 	return vertices, signal, nil
 }

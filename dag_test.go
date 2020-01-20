@@ -676,6 +676,7 @@ func TestDAG_AncestorsWalkerSignal(t *testing.T) {
 		ancestors = append(ancestors, v)
 		if v == v2 {
 			signal <- true
+			break
 		}
 	}
 	if !Equal(ancestors, []Vertex{v4, v2}) {
@@ -771,6 +772,7 @@ func ExampleDAG_AncestorsWalker() {
 		ancestors = append(ancestors, v)
 		if v == v2 {
 			signal <- true
+			break
 		}
 	}
 	fmt.Printf("%v", ancestors)
