@@ -13,7 +13,6 @@ func (v myVertex) String() string {
 	return fmt.Sprintf("%d", v.value)
 }
 
-
 func TestNewDAG(t *testing.T) {
 	dag := NewDAG()
 	if order := dag.GetOrder(); order != 0 {
@@ -59,14 +58,13 @@ func TestDAG_AddVertex(t *testing.T) {
 	}
 
 	// nil
-	errNil:= dag.AddVertex(nil)
+	errNil := dag.AddVertex(nil)
 	if errNil == nil {
 		t.Errorf("AddVertex(nil) = nil, want %T", VertexNilError{})
 	}
 	if _, ok := errNil.(VertexNilError); !ok {
 		t.Errorf("AddVertex(nil) expected VertexNilError, got %T", errNil)
 	}
-
 
 }
 
@@ -113,10 +111,10 @@ func TestDAG_DeleteVertex(t *testing.T) {
 		t.Errorf("GetVertices() = %d, want 3", vertices)
 	}
 	if vertices, _ := dag.GetDescendants(v1); len(vertices) != 2 {
-		t.Errorf("GetDescendants(v1) = %d, want 2", len(vertices) )
+		t.Errorf("GetDescendants(v1) = %d, want 2", len(vertices))
 	}
 	if vertices, _ := dag.GetAncestors(v3); len(vertices) != 2 {
-		t.Errorf("GetAncestors(v3) = %d, want 2", len(vertices) )
+		t.Errorf("GetAncestors(v3) = %d, want 2", len(vertices))
 	}
 
 	_ = dag.DeleteVertex(v2)
@@ -136,12 +134,11 @@ func TestDAG_DeleteVertex(t *testing.T) {
 		t.Errorf("GetVertices() = %d, want 2", vertices)
 	}
 	if vertices, _ := dag.GetDescendants(v1); len(vertices) != 0 {
-		t.Errorf("GetDescendants(v1) = %d, want 0", len(vertices) )
+		t.Errorf("GetDescendants(v1) = %d, want 0", len(vertices))
 	}
 	if vertices, _ := dag.GetAncestors(v3); len(vertices) != 0 {
-		t.Errorf("GetAncestors(v3) = %d, want 0", len(vertices) )
+		t.Errorf("GetAncestors(v3) = %d, want 0", len(vertices))
 	}
-
 
 	// unknown
 	foo := &myVertex{-1}
@@ -154,7 +151,7 @@ func TestDAG_DeleteVertex(t *testing.T) {
 	}
 
 	// nil
-	errNil:= dag.DeleteVertex(nil)
+	errNil := dag.DeleteVertex(nil)
 	if errNil == nil {
 		t.Errorf("DeleteVertex(nil) = nil, want %T", VertexNilError{})
 	}
@@ -185,10 +182,10 @@ func TestDAG_AddEdge(t *testing.T) {
 		t.Errorf("GetLeafs() = %d, want 1", roots)
 	}
 	if vertices, _ := dag.GetDescendants(v1); len(vertices) != 1 {
-		t.Errorf("GetDescendants(v1) = %d, want 1", len(vertices) )
+		t.Errorf("GetDescendants(v1) = %d, want 1", len(vertices))
 	}
 	if vertices, _ := dag.GetAncestors(v2); len(vertices) != 1 {
-		t.Errorf("GetAncestors(v2) = %d, want 1", len(vertices) )
+		t.Errorf("GetAncestors(v2) = %d, want 1", len(vertices))
 	}
 
 	err := dag.AddEdge(v2, v3)
@@ -196,18 +193,18 @@ func TestDAG_AddEdge(t *testing.T) {
 		t.Fatal(err)
 	}
 	if vertices, _ := dag.GetDescendants(v1); len(vertices) != 2 {
-		t.Errorf("GetDescendants(v1) = %d, want 2", len(vertices) )
+		t.Errorf("GetDescendants(v1) = %d, want 2", len(vertices))
 	}
 	if vertices, _ := dag.GetAncestors(v3); len(vertices) != 2 {
-		t.Errorf("GetAncestors(v3) = %d, want 2", len(vertices) )
+		t.Errorf("GetAncestors(v3) = %d, want 2", len(vertices))
 	}
 
 	_ = dag.AddEdge(v0, v1)
 	if vertices, _ := dag.GetDescendants(v0); len(vertices) != 3 {
-		t.Errorf("GetDescendants(v0) = %d, want 3", len(vertices) )
+		t.Errorf("GetDescendants(v0) = %d, want 3", len(vertices))
 	}
 	if vertices, _ := dag.GetAncestors(v3); len(vertices) != 3 {
-		t.Errorf("GetAncestors(v3) = %d, want 3", len(vertices) )
+		t.Errorf("GetAncestors(v3) = %d, want 3", len(vertices))
 	}
 
 	// loop
@@ -289,7 +286,7 @@ func TestDAG_DeleteEdge(t *testing.T) {
 	if _, ok := errNilDst.(VertexNilError); !ok {
 		t.Errorf("DeleteEdge(v0, nil) expected VertexNilError, got %T", errNilDst)
 	}
-	
+
 	// unknown
 	foo := &myVertex{-1}
 	errUnknownSrc := dag.DeleteEdge(foo, v1)
@@ -329,7 +326,7 @@ func TestDAG_GetChildren(t *testing.T) {
 	}
 
 	// nil
-	_, errNil:= dag.GetChildren(nil)
+	_, errNil := dag.GetChildren(nil)
 	if errNil == nil {
 		t.Errorf("GetChildren(nil) = nil, want %T", VertexNilError{})
 	}
@@ -368,7 +365,7 @@ func TestDAG_GetParents(t *testing.T) {
 	}
 
 	// nil
-	_, errNil:= dag.GetParents(nil)
+	_, errNil := dag.GetParents(nil)
 	if errNil == nil {
 		t.Errorf("GetParents(nil) = nil, want %T", VertexNilError{})
 	}
@@ -412,7 +409,7 @@ func TestDAG_GetDescendants(t *testing.T) {
 	}
 
 	// nil
-	_, errNil:= dag.GetDescendants(nil)
+	_, errNil := dag.GetDescendants(nil)
 	if errNil == nil {
 		t.Errorf("GetDescendants(nil) = nil, want %T", VertexNilError{})
 	}
@@ -427,6 +424,64 @@ func TestDAG_GetDescendants(t *testing.T) {
 	}
 	if _, ok := errUnknown.(VertexUnknownError); !ok {
 		t.Errorf("GetDescendants(v5) expected VertexUnknownError, got %T", errUnknown)
+	}
+}
+
+func Equal(a, b []Vertex) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for i, v := range a {
+		if v != b[i] {
+			return false
+		}
+	}
+	return true
+}
+
+func TestDAG_GetOrderedDescendants(t *testing.T) {
+	dag := NewDAG()
+	v1 := &myVertex{1}
+	v2 := &myVertex{2}
+	v3 := &myVertex{3}
+	v4 := &myVertex{4}
+	v5 := &myVertex{5}
+	_ = dag.AddEdge(v1, v2)
+	_ = dag.AddEdge(v2, v3)
+	_ = dag.AddEdge(v2, v4)
+
+	if desc, _ := dag.GetOrderedDescendants(v1); len(desc) != 3 {
+		t.Errorf("GetOrderedDescendants(v1) = %d, want 3", len(desc))
+	}
+	if desc, _ := dag.GetOrderedDescendants(v2); len(desc) != 2 {
+		t.Errorf("GetOrderedDescendants(v2) = %d, want 2", len(desc))
+	}
+	if desc, _ := dag.GetOrderedDescendants(v3); len(desc) != 0 {
+		t.Errorf("GetOrderedDescendants(v4) = %d, want 0", len(desc))
+	}
+	if desc, _ := dag.GetOrderedDescendants(v4); len(desc) != 0 {
+		t.Errorf("GetOrderedDescendants(v4) = %d, want 0", len(desc))
+	}
+	if desc, _ := dag.GetOrderedDescendants(v1); !Equal(desc, []Vertex{v2, v3, v4}) && !Equal(desc, []Vertex{v2, v4, v3}) {
+		t.Errorf("GetOrderedDescendants(v4) = %v, want %v or %v", desc, []Vertex{v2, v3, v4}, []Vertex{v2, v4, v3})
+	}
+
+	// nil
+	_, errNil := dag.GetOrderedDescendants(nil)
+	if errNil == nil {
+		t.Errorf("GetOrderedDescendants(nil) = nil, want %T", VertexNilError{})
+	}
+	if _, ok := errNil.(VertexNilError); !ok {
+		t.Errorf("GetOrderedDescendants(nil) expected VertexNilError, got %T", errNil)
+	}
+
+	// unknown
+	_, errUnknown := dag.GetOrderedDescendants(v5)
+	if errUnknown == nil {
+		t.Errorf("GetOrderedDescendants(v5) = nil, want %T", VertexUnknownError{v5})
+	}
+	if _, ok := errUnknown.(VertexUnknownError); !ok {
+		t.Errorf("GetOrderedDescendants(v5) expected VertexUnknownError, got %T", errUnknown)
 	}
 }
 
@@ -481,7 +536,7 @@ func TestDAG_GetAncestors(t *testing.T) {
 	}
 
 	// nil
-	_, errNil:= dag.GetAncestors(nil)
+	_, errNil := dag.GetAncestors(nil)
 	if errNil == nil {
 		t.Errorf("GetAncestors(nil) = nil, want %T", VertexNilError{})
 	}
@@ -497,6 +552,134 @@ func TestDAG_GetAncestors(t *testing.T) {
 	}
 	if _, ok := errUnknown.(VertexUnknownError); !ok {
 		t.Errorf("GetAncestors(foo) expected VertexUnknownError, got %T", errUnknown)
+	}
+
+}
+
+func TestDAG_GetOrderedAncestors(t *testing.T) {
+	dag := NewDAG()
+	v1 := &myVertex{1}
+	v2 := &myVertex{2}
+	v3 := &myVertex{3}
+	v4 := &myVertex{4}
+	v5 := &myVertex{5}
+	_ = dag.AddEdge(v1, v2)
+	_ = dag.AddEdge(v2, v3)
+	_ = dag.AddEdge(v2, v4)
+
+	if desc, _ := dag.GetOrderedAncestors(v4); len(desc) != 2 {
+		t.Errorf("GetOrderedAncestors(v4) = %d, want 2", len(desc))
+	}
+	if desc, _ := dag.GetOrderedAncestors(v2); len(desc) != 1 {
+		t.Errorf("GetOrderedAncestors(v2) = %d, want 1", len(desc))
+	}
+	if desc, _ := dag.GetOrderedAncestors(v1); len(desc) != 0 {
+		t.Errorf("GetOrderedAncestors(v1) = %d, want 0", len(desc))
+	}
+	if desc, _ := dag.GetOrderedAncestors(v4); !Equal(desc, []Vertex{v2, v1}) {
+		t.Errorf("GetOrderedAncestors(v4) = %v, want %v", desc, []Vertex{v2, v1})
+	}
+
+	// nil
+	_, errNil := dag.GetOrderedAncestors(nil)
+	if errNil == nil {
+		t.Errorf("GetOrderedAncestors(nil) = nil, want %T", VertexNilError{})
+	}
+	if _, ok := errNil.(VertexNilError); !ok {
+		t.Errorf("GetOrderedAncestors(nil) expected VertexNilError, got %T", errNil)
+	}
+
+	// unknown
+	_, errUnknown := dag.GetOrderedAncestors(v5)
+	if errUnknown == nil {
+		t.Errorf("GetOrderedAncestors(v5) = nil, want %T", VertexUnknownError{v5})
+	}
+	if _, ok := errUnknown.(VertexUnknownError); !ok {
+		t.Errorf("GetOrderedAncestors(v5) expected VertexUnknownError, got %T", errUnknown)
+	}
+}
+
+func TestDAG_AncestorsWalker(t *testing.T) {
+	dag := NewDAG()
+	v1 := &myVertex{1}
+	v2 := &myVertex{2}
+	v3 := &myVertex{3}
+	v4 := &myVertex{4}
+	v5 := &myVertex{5}
+	v6 := &myVertex{6}
+	v7 := &myVertex{7}
+	v8 := &myVertex{8}
+	v9 := &myVertex{9}
+	v10 := &myVertex{10}
+	foo := &myVertex{-1}
+
+	_ = dag.AddEdge(v1, v2)
+	_ = dag.AddEdge(v1, v3)
+	_ = dag.AddEdge(v2, v4)
+	_ = dag.AddEdge(v2, v5)
+	_ = dag.AddEdge(v4, v6)
+	_ = dag.AddEdge(v5, v6)
+	_ = dag.AddEdge(v6, v7)
+	_ = dag.AddEdge(v7, v8)
+	_ = dag.AddEdge(v7, v9)
+	_ = dag.AddEdge(v8, v10)
+	_ = dag.AddEdge(v9, v10)
+
+	vertices, _, _ := dag.AncestorsWalker(v10)
+	var ancestors []Vertex
+	for v := range vertices {
+		ancestors = append(ancestors, v)
+	}
+	exp1 := []Vertex{v9, v8, v7, v6, v4, v5, v2, v1}
+	exp2 := []Vertex{v8, v9, v7, v6, v4, v5, v2, v1}
+	exp3 := []Vertex{v9, v8, v7, v6, v5, v4, v2, v1}
+	exp4 := []Vertex{v8, v9, v7, v6, v5, v4, v2, v1}
+	if !(Equal(ancestors, exp1) || Equal(ancestors, exp2) || Equal(ancestors, exp3) || Equal(ancestors, exp4)) {
+		t.Errorf("AncestorsWalker(v10) = %v, want %v, %v, %v, or %v ", ancestors, exp1, exp2, exp3, exp4)
+	}
+
+	// nil
+	_, _, errNil := dag.AncestorsWalker(nil)
+	if errNil == nil {
+		t.Errorf("AncestorsWalker(nil) = nil, want %T", VertexNilError{})
+	}
+	if _, ok := errNil.(VertexNilError); !ok {
+		t.Errorf("AncestorsWalker(nil) expected VertexNilError, got %T", errNil)
+	}
+
+	// unknown
+	_, _, errUnknown := dag.AncestorsWalker(foo)
+	if errUnknown == nil {
+		t.Errorf("AncestorsWalker(foo) = nil, want %T", VertexUnknownError{foo})
+	}
+	if _, ok := errUnknown.(VertexUnknownError); !ok {
+		t.Errorf("AncestorsWalker(foo) expected VertexUnknownError, got %T", errUnknown)
+	}
+}
+
+func TestDAG_AncestorsWalkerSignal(t *testing.T) {
+	dag := NewDAG()
+
+	v1 := &myVertex{1}
+	v2 := &myVertex{2}
+	v3 := &myVertex{3}
+	v4 := &myVertex{4}
+	v5 := &myVertex{5}
+	_ = dag.AddEdge(v1, v2)
+	_ = dag.AddEdge(v2, v3)
+	_ = dag.AddEdge(v2, v4)
+	_ = dag.AddEdge(v4, v5)
+
+	var ancestors []Vertex
+	vertices, signal, _ := dag.AncestorsWalker(v5)
+	for v := range vertices {
+		ancestors = append(ancestors, v)
+		if v == v2 {
+			signal <- true
+		}
+	}
+	if !Equal(ancestors, []Vertex{v4, v2}) {
+		t.Errorf("AncestorsWalker(v4) = %v, want %v", ancestors, []Vertex{v4, v2})
 	}
 
 }
@@ -523,7 +706,7 @@ func TestErrors(t *testing.T) {
 
 	tests := []struct {
 		want string
-		err error
+		err  error
 	}{
 		{"don't know what to do with 'nil'", VertexNilError{}},
 		{"'1' is already known", VertexDuplicateError{v1}},
@@ -569,6 +752,33 @@ func Example() {
 	//   1 -> 3
 }
 
+func Example_AncestorsWalker() {
+	dag := NewDAG()
+
+	v1 := &myVertex{1}
+	v2 := &myVertex{2}
+	v3 := &myVertex{3}
+	v4 := &myVertex{4}
+	v5 := &myVertex{5}
+	_ = dag.AddEdge(v1, v2)
+	_ = dag.AddEdge(v2, v3)
+	_ = dag.AddEdge(v2, v4)
+	_ = dag.AddEdge(v4, v5)
+
+	var ancestors []Vertex
+	vertices, signal, _ := dag.AncestorsWalker(v5)
+	for v := range vertices {
+		ancestors = append(ancestors, v)
+		if v == v2 {
+			signal <- true
+		}
+	}
+	fmt.Printf("%v", ancestors)
+
+	// Output:
+	//   [4 2]
+}
+
 func TestLarge(t *testing.T) {
 	d := NewDAG()
 	root := &myVertex{1}
@@ -599,12 +809,12 @@ func TestLarge(t *testing.T) {
 	}
 
 	/*
-	var childList []Vertex
-	for x := range children {
-		childList = append(childList, x)
-	}
-	_ = d.DeleteEdge(root, childList[0])
-	 */
+		var childList []Vertex
+		for x := range children {
+			childList = append(childList, x)
+		}
+		_ = d.DeleteEdge(root, childList[0])
+	*/
 }
 
 func largeAux(d *DAG, level int, branches int, parent *myVertex) (int, int) {

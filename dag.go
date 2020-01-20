@@ -417,6 +417,100 @@ func (d *DAG) GetAncestors(v Vertex) (map[Vertex]bool, error) {
 	return copyMap(d.getAncestorsAux(v)), nil
 }
 
+// GetOrderedAncestors returns all ancestors of a vertex in a breath first order
+func (d *DAG) GetOrderedAncestors(v Vertex) ([]Vertex, error) {
+
+	// sanity checking
+	if v == nil {
+		return nil, VertexNilError{}
+	}
+	d.muDAG.RLock()
+	defer d.muDAG.RUnlock()
+	if _, ok := d.vertices[v]; !ok {
+		return nil, VertexUnknownError{v}
+	}
+	vertices, _, _ := d.AncestorsWalker(v)
+	var ancestors []Vertex
+	for v := range vertices {
+		ancestors = append(ancestors, v)
+	}
+	return ancestors, nil
+}
+
+func (d *DAG) walkAncestors(v Vertex, vertices chan Vertex, signal chan bool) error {
+
+	var fifo []Vertex
+	visited := make(map[Vertex]bool)
+	for parent := range d.inboundEdge[v] {
+		visited[parent] = true
+		fifo = append(fifo, parent)
+	}
+	for {
+		if len(fifo) == 0 {
+			return nil
+		}
+		top := fifo[0]
+		fifo = fifo[1:]
+		for parent := range d.inboundEdge[top] {
+			if !visited[parent] {
+				visited[parent] = true
+				fifo = append(fifo, parent)
+			}
+		}
+		select {
+		case <-signal:
+			return nil
+		default:
+			vertices <- top
+		}
+	}
+}
+
+// AncestorsWalker returns a channel and subsequently returns / walks all
+// ancestors of a vertex in a breath first order.
+// The second channel returned may be used to stop further walking.
+func (d *DAG) AncestorsWalker(v Vertex) (chan Vertex, chan bool, error) {
+	// sanity checking
+	if v == nil {
+		return nil, nil, VertexNilError{}
+	}
+	d.muDAG.RLock()
+	if _, ok := d.vertices[v]; !ok {
+		return nil, nil, VertexUnknownError{v}
+	}
+	d.muDAG.RUnlock()
+
+	vertices := make(chan Vertex)
+	signal := make(chan bool, 1)
+	go func() {
+		d.muDAG.RLock()
+		d.walkAncestors(v, vertices, signal)
+		d.muDAG.RUnlock()
+		close(vertices)
+	}()
+	return vertices, signal, nil
+}
+
+// GetOrderedDescendants returns all descendants of a vertex in a breath first order
+func (d *DAG) GetOrderedDescendants(v Vertex) ([]Vertex, error) {
+
+	// sanity checking
+	if v == nil {
+		return nil, VertexNilError{}
+	}
+	d.muDAG.RLock()
+	defer d.muDAG.RUnlock()
+	if _, ok := d.vertices[v]; !ok {
+		return nil, VertexUnknownError{v}
+	}
+	vertices, _, _ := d.DescendantsWalker(v)
+	var descendants []Vertex
+	for v := range vertices {
+		descendants = append(descendants, v)
+	}
+	return descendants, nil
+}
+
 func (d *DAG) getDescendantsAux(v Vertex) map[Vertex]bool {
 
 	// in the best case we have already a populated cache
@@ -484,6 +578,60 @@ func (d *DAG) GetDescendants(v Vertex) (map[Vertex]bool, error) {
 	}
 
 	return copyMap(d.getDescendantsAux(v)), nil
+}
+
+func (d *DAG) walkDescendants(v Vertex, vertices chan Vertex, signal chan bool) error {
+
+	var fifo []Vertex
+	visited := make(map[Vertex]bool)
+	for child := range d.outboundEdge[v] {
+		visited[child] = true
+		fifo = append(fifo, child)
+	}
+	for {
+		if len(fifo) == 0 {
+			return nil
+		}
+		top := fifo[0]
+		fifo = fifo[1:]
+		for child := range d.outboundEdge[top] {
+			if !visited[child] {
+				visited[child] = true
+				fifo = append(fifo, child)
+			}
+		}
+		select {
+		case <-signal:
+			return nil
+		default:
+			vertices <- top
+		}
+	}
+}
+
+// DescendantsWalker returns a channel and subsequently returns / walks all
+// descendants of a vertex in a breath first order.
+// The second channel returned may be used to stop further walking.
+func (d *DAG) DescendantsWalker(v Vertex) (chan Vertex, chan bool, error) {
+	// sanity checking
+	if v == nil {
+		return nil, nil, VertexNilError{}
+	}
+	d.muDAG.RLock()
+	if _, ok := d.vertices[v]; !ok {
+		return nil, nil, VertexUnknownError{v}
+	}
+	d.muDAG.RUnlock()
+
+	vertices := make(chan Vertex)
+	signal := make(chan bool, 1)
+	go func() {
+		d.muDAG.RLock()
+		d.walkDescendants(v, vertices, signal)
+		d.muDAG.RUnlock()
+		close(vertices)
+	}()
+	return vertices, signal, nil
 }
 
 // Return a representation of the graph.
