@@ -752,7 +752,7 @@ func Example() {
 	//   1 -> 3
 }
 
-func ExampleAncestorsWalker() {
+func ExampleDAG_AncestorsWalker() {
 	dag := NewDAG()
 
 	v1 := &myVertex{1}
