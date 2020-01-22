@@ -71,7 +71,9 @@ func main() {
 		childList = append(childList, x)
 	}
 	start = time.Now()
-	_ = d.DeleteEdge(root, childList[0])
+	if len(childList) > 0 {
+		_ = d.DeleteEdge(root, childList[0])
+	}
 	end = time.Now()
 	fmt.Printf("%fs to delete an edge from the root\n", end.Sub(start).Seconds())
 
