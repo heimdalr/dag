@@ -26,7 +26,7 @@ func main() {
 	largeAux(d, levels, branches, root)
 	end = time.Now()
 	fmt.Printf("%fs to add %d vertices and %d edges\n", end.Sub(start).Seconds(), d.GetOrder(), d.GetSize())
-	expectedVertexCount := sum(0, levels - 1 , branches, pow)
+	expectedVertexCount := sum(0, levels-1, branches, pow)
 	vertexCount := len(d.GetVertices())
 	if vertexCount != expectedVertexCount {
 		panic(fmt.Sprintf("GetVertices() = %d, want %d", vertexCount, expectedVertexCount))
@@ -51,9 +51,8 @@ func main() {
 		panic(fmt.Sprintf("GetOrderedDescendants(root) = %d, want %d", descendantsOrderedCount, expectedDescendantsCount))
 	}
 
-
 	start = time.Now()
-	descendants, _ = d.GetDescendants(root)
+	_, _ = d.GetDescendants(root)
 	end = time.Now()
 	fmt.Printf("%fs to get descendants 2nd time\n", end.Sub(start).Seconds())
 
@@ -112,4 +111,3 @@ func pow(base int, exp int) int {
 	pow := math.Pow(float64(base), float64(exp))
 	return int(pow)
 }
-

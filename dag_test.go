@@ -801,7 +801,7 @@ func TestLarge(t *testing.T) {
 		t.Errorf("GetDescendants(root) = %d, want %d", descendantsCount, expectedDescendantsCount)
 	}
 
-	descendants, _ = d.GetDescendants(root)
+	_, _ = d.GetDescendants(root)
 
 	children, _ := d.GetChildren(root)
 	childrenCount := len(children)
