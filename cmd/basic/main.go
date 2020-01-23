@@ -10,8 +10,13 @@ type myVertex struct {
 	value int
 }
 
-// implement the Vertex interface
+// implement the Vertex's interface method String()
 func (v myVertex) String() string {
+	return fmt.Sprintf("%d", v.value)
+}
+
+// implement the Vertex's interface method Id()
+func (v myVertex) Id() string {
 	return fmt.Sprintf("%d", v.value)
 }
 

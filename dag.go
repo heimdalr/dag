@@ -9,6 +9,7 @@ import (
 // Interface for the nodes in the DAG.
 type Vertex interface {
 	String() string
+	Id() string
 }
 
 // The DAG type implements a Directed Acyclic Graph.
@@ -138,7 +139,7 @@ func (d *DAG) DeleteVertex(v Vertex) error {
 
 	// delete v itself
 	delete(d.vertices, v)
-	delete(d.vertexIds, v.String())
+	delete(d.vertexIds, v.Id())
 
 	d.muDAG.Unlock()
 
@@ -718,7 +719,7 @@ type IdDuplicateError struct {
 
 // Implements the error interface.
 func (e IdDuplicateError) Error() string {
-	return fmt.Sprintf("'%s' (the id) is already known", e.v.String())
+	return fmt.Sprintf("the id '%s' is already known", e.v.Id())
 }
 
 // Error type to describe the situation, that a given vertex does not exit in the graph.
