@@ -11,7 +11,13 @@ type largeVertex struct {
 	value int
 }
 
+// implement the Vertex's interface method String()
 func (v largeVertex) String() string {
+	return fmt.Sprintf("%d", v.value)
+}
+
+// implement the Vertex's interface method Id()
+func (v largeVertex) Id() string {
 	return fmt.Sprintf("%d", v.value)
 }
 

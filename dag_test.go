@@ -9,7 +9,13 @@ type myVertex struct {
 	value int
 }
 
+// implement the Vertex's interface method String()
 func (v myVertex) String() string {
+	return fmt.Sprintf("%d", v.value)
+}
+
+// implement the Vertex's interface method Id()
+func (v myVertex) Id() string {
 	return fmt.Sprintf("%d", v.value)
 }
 
@@ -66,6 +72,34 @@ func TestDAG_AddVertex(t *testing.T) {
 		t.Errorf("AddVertex(nil) expected VertexNilError, got %T", errNil)
 	}
 
+}
+
+func TestDAG_GetVertex(t *testing.T) {
+	dag := NewDAG()
+	v1 := &myVertex{1}
+	id := v1.String()
+	_ = dag.AddVertex(v1)
+	if v, _ := dag.GetVertex(id); v != v1 {
+		t.Errorf("GetVertex() = %s, want %s", v.String(), v1.String())
+	}
+
+	// unknown
+	_, errUnknown := dag.GetVertex("foo")
+	if errUnknown == nil {
+		t.Errorf("DeleteVertex(\"foo\") = nil, want %T", IdUnknownError{"foo"})
+	}
+	if _, ok := errUnknown.(IdUnknownError); !ok {
+		t.Errorf("DeleteVertex(\"foo\") expected IdUnknownError, got %T", errUnknown)
+	}
+
+	// nil
+	_, errNil := dag.GetVertex("")
+	if errNil == nil {
+		t.Errorf("DeleteVertex(\"\") = nil, want %T", IdEmptyError{})
+	}
+	if _, ok := errNil.(IdEmptyError); !ok {
+		t.Errorf("DeleteVertex(\"\") expected IdEmptyError, got %T", errNil)
+	}
 }
 
 func TestDAG_DeleteVertex(t *testing.T) {

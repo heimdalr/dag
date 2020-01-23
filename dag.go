@@ -9,12 +9,14 @@ import (
 // Interface for the nodes in the DAG.
 type Vertex interface {
 	String() string
+	Id() string
 }
 
 // The DAG type implements a Directed Acyclic Graph.
 type DAG struct {
 	muDAG            sync.RWMutex
 	vertices         map[Vertex]bool
+	vertexIds        map[string]Vertex
 	inboundEdge      map[Vertex]map[Vertex]bool
 	outboundEdge     map[Vertex]map[Vertex]bool
 	muCache          sync.RWMutex
@@ -27,6 +29,7 @@ type DAG struct {
 func NewDAG() *DAG {
 	return &DAG{
 		vertices:         make(map[Vertex]bool),
+		vertexIds:        make(map[string]Vertex),
 		inboundEdge:      make(map[Vertex]map[Vertex]bool),
 		outboundEdge:     make(map[Vertex]map[Vertex]bool),
 		verticesLocked:   newDMutex(),
@@ -43,18 +46,40 @@ func (d *DAG) AddVertex(v Vertex) error {
 	if v == nil {
 		return VertexNilError{}
 	}
+	id := v.String()
 	d.muDAG.RLock()
-	_, exists := d.vertices[v]
+	_, VertexExists := d.vertices[v]
+	_, IdExists := d.vertexIds[id]
 	d.muDAG.RUnlock()
-	if exists {
+	if VertexExists {
 		return VertexDuplicateError{v}
 	}
-
+	if IdExists {
+		return IdDuplicateError{v}
+	}
 	d.muDAG.Lock()
 	d.vertices[v] = true
+	d.vertexIds[id] = v
 	d.muDAG.Unlock()
 
 	return nil
+}
+
+// Get a vertex by its id.
+func (d *DAG) GetVertex(id string) (Vertex, error) {
+
+	// sanity checking
+	if id == "" {
+		return nil, IdEmptyError{}
+	}
+	d.muDAG.RLock()
+	v, IdExists := d.vertexIds[id]
+	d.muDAG.RUnlock()
+	if !IdExists {
+		return nil, IdUnknownError{id}
+	}
+
+	return v, nil
 }
 
 // Delete a vertex including all inbound and outbound edges. Delete cached ancestors and descendants of relevant
@@ -114,6 +139,7 @@ func (d *DAG) DeleteVertex(v Vertex) error {
 
 	// delete v itself
 	delete(d.vertices, v)
+	delete(d.vertexIds, v.Id())
 
 	d.muDAG.Unlock()
 
@@ -132,10 +158,12 @@ func (d *DAG) AddEdge(src Vertex, dst Vertex) error {
 	}
 
 	// ensure vertices
-	d.muDAG.Lock()
-	d.vertices[src] = true
-	d.vertices[dst] = true
-	d.muDAG.Unlock()
+	if !d.vertices[src] {
+		d.AddVertex(src)
+	}
+	if !d.vertices[dst] {
+		d.AddVertex(dst)
+	}
 
 	// test / compute edge nodes and the edge itself
 	d.muDAG.RLock()
@@ -666,6 +694,14 @@ func (e VertexNilError) Error() string {
 	return fmt.Sprint("don't know what to do with 'nil'")
 }
 
+// Error type to describe the situation, that a nil is given instead of a vertex.
+type IdEmptyError struct{}
+
+// Implements the error interface.
+func (e IdEmptyError) Error() string {
+	return fmt.Sprint("don't know what to do with 'nil'")
+}
+
 // Error type to describe the situation, that a given vertex already exists in the graph.
 type VertexDuplicateError struct {
 	v Vertex
@@ -676,6 +712,16 @@ func (e VertexDuplicateError) Error() string {
 	return fmt.Sprintf("'%s' is already known", e.v.String())
 }
 
+// Error type to describe the situation, that a given vertex id already exists in the graph.
+type IdDuplicateError struct {
+	v Vertex
+}
+
+// Implements the error interface.
+func (e IdDuplicateError) Error() string {
+	return fmt.Sprintf("the id '%s' is already known", e.v.Id())
+}
+
 // Error type to describe the situation, that a given vertex does not exit in the graph.
 type VertexUnknownError struct {
 	v Vertex
@@ -684,6 +730,16 @@ type VertexUnknownError struct {
 // Implements the error interface.
 func (e VertexUnknownError) Error() string {
 	return fmt.Sprintf("'%s' is unknown", e.v.String())
+}
+
+// Error type to describe the situation, that a given vertex does not exit in the graph.
+type IdUnknownError struct {
+	id string
+}
+
+// Implements the error interface.
+func (e IdUnknownError) Error() string {
+	return fmt.Sprintf("'%s' is unknown", e.id)
 }
 
 // Error type to describe the situation, that an edge already exists in the graph.
