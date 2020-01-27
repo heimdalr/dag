@@ -1,4 +1,4 @@
-// Package dag implements a Directed Acyclic Graph data structure and relevant methods.
+// Package dag implements directed acyclic graphs (DAGs).
 package dag
 
 import (
@@ -6,13 +6,17 @@ import (
 	"sync"
 )
 
-// Interface for the nodes in the DAG.
+// Vertex is the interface to be implemented for the vertices of the DAG.
 type Vertex interface {
+
+	// Return a string representation of the vertex.
 	String() string
+
+	// Return the id of this vertex. This id must be unique and never change.
 	Id() string
 }
 
-// The DAG type implements a Directed Acyclic Graph.
+// DAG implements the data structure of the DAG.
 type DAG struct {
 	muDAG            sync.RWMutex
 	vertices         map[Vertex]bool
@@ -23,9 +27,11 @@ type DAG struct {
 	verticesLocked   *dMutex
 	ancestorsCache   map[Vertex]map[Vertex]bool
 	descendantsCache map[Vertex]map[Vertex]bool
+	ancestors   map[Vertex]map[Vertex]bool
+	descendants map[Vertex]map[Vertex]bool
 }
 
-// Creates / initializes a new Directed Acyclic Graph or DAG.
+// NewDAG creates / initializes a new DAG.
 func NewDAG() *DAG {
 	return &DAG{
 		vertices:         make(map[Vertex]bool),
@@ -35,21 +41,22 @@ func NewDAG() *DAG {
 		verticesLocked:   newDMutex(),
 		ancestorsCache:   make(map[Vertex]map[Vertex]bool),
 		descendantsCache: make(map[Vertex]map[Vertex]bool),
+		ancestors:   make(map[Vertex]map[Vertex]bool),
+		descendants: make(map[Vertex]map[Vertex]bool),
 	}
 }
 
-// Add a vertex.
-// For vertices that are part of an edge use AddEdge() instead.
+// AddVertex adds the vertex v to the DAG. AddVertex returns an error, if v is
+// nil, v is already part of the graph, or the id of v is already part of the
+// graph.
 func (d *DAG) AddVertex(v Vertex) error {
 
-	// sanity checking
 	if v == nil {
 		return VertexNilError{}
 	}
-	id := v.String()
 	d.muDAG.RLock()
 	_, VertexExists := d.vertices[v]
-	_, IdExists := d.vertexIds[id]
+	_, IdExists := d.vertexIds[v.Id()]
 	d.muDAG.RUnlock()
 	if VertexExists {
 		return VertexDuplicateError{v}
@@ -57,15 +64,23 @@ func (d *DAG) AddVertex(v Vertex) error {
 	if IdExists {
 		return IdDuplicateError{v}
 	}
-	d.muDAG.Lock()
-	d.vertices[v] = true
-	d.vertexIds[id] = v
-	d.muDAG.Unlock()
-
+	d.addVertex(v)
 	return nil
 }
 
-// Get a vertex by its id.
+func (d *DAG) addVertex(v Vertex) {
+	d.muDAG.Lock()
+	d.vertices[v] = true
+	d.vertexIds[v.Id()] = v
+	d.outboundEdge[v] = make(map[Vertex]bool)
+	d.inboundEdge[v] = make(map[Vertex]bool)
+	d.ancestors[v] = make(map[Vertex]bool)
+	d.descendants[v] = make(map[Vertex]bool)
+	d.muDAG.Unlock()
+}
+
+// GetVertex returns a vertex by its id. GetVertex returns an error, if id is
+// the empty string or id is unknown.
 func (d *DAG) GetVertex(id string) (Vertex, error) {
 
 	// sanity checking
@@ -82,8 +97,158 @@ func (d *DAG) GetVertex(id string) (Vertex, error) {
 	return v, nil
 }
 
-// Delete a vertex including all inbound and outbound edges. Delete cached ancestors and descendants of relevant
-// vertices.
+func map2list(m map[Vertex]bool) []Vertex {
+	s := make([]Vertex, 0, len(m))
+	for e := range(m) {
+		s = append(s, e)
+	}
+	return s
+}
+
+// AddEdge adds an edge between src and dst. AddEdge returns an error, if the
+// edge would create a loop. AddEdge calls AddVertex, if src and/or dst are not
+// yet known within the DAG.
+func (d *DAG) AddEdge(src Vertex, dst Vertex) error {
+
+	// sanity checking
+	if src == nil || dst == nil {
+		return VertexNilError{}
+	}
+
+	// check for equality
+	if src == dst {
+		return SrcDstEqualError{src, dst}
+	}
+
+	// ensure vertices
+	if !d.vertices[src] {
+		d.AddVertex(src)
+	}
+	if !d.vertices[dst] {
+		d.AddVertex(dst)
+	}
+
+	d.muDAG.RLock()
+
+	// check whether this edge is already known
+	if value, exists := d.outboundEdge[src][dst]; exists && value {
+		return EdgeDuplicateError{src, dst}
+	}
+
+	// check for loops
+	if d.descendants[dst][src] {
+		return EdgeLoopError{src, dst}
+	}
+
+	d.muDAG.RUnlock()
+	d.muDAG.Lock()
+
+	// dst is a child of src
+	d.outboundEdge[src][dst] = true
+
+	// src is a parent of dst
+	d.inboundEdge[dst][src] = true
+
+	// compute the list of ancestors of src
+	ancestorsOfSrc := map2list(d.ancestors[src])
+
+	// compute the list of descendants of dst
+	descendantsOfDst := map2list(d.descendants[dst])
+
+	// for all descendants of dst and dst itself
+	for _, descendentOfDst := range append(descendantsOfDst, dst) {
+
+		// add the ancestors of src as ancestors
+		for _, ancestorOfSrc := range ancestorsOfSrc {
+			d.ancestors[descendentOfDst][ancestorOfSrc] = true
+		}
+
+		// add src itself as ancestors
+		d.ancestors[descendentOfDst][src] = true
+	}
+
+	// for all ancestors of src and src itself
+	for _, ancestorOfSrc := range append(ancestorsOfSrc, src) {
+
+		// add the descendents of dst descendents
+		for _, descendentOfDst := range descendantsOfDst {
+			d.ancestors[ancestorOfSrc][descendentOfDst] = true
+		}
+
+		// add dst itself as descendant
+		d.ancestors[ancestorOfSrc][dst] = true
+	}
+
+	d.muDAG.Unlock()
+
+	return nil
+}
+
+// Delete an edge.
+func (d *DAG) DeleteEdge(src Vertex, dst Vertex) error {
+
+	// sanity checking
+	if src == nil || dst == nil {
+		return VertexNilError{}
+	}
+
+	// check for equality
+	if src == dst {
+		return SrcDstEqualError{src, dst}
+	}
+
+	d.muDAG.RLock()
+
+	if _, ok := d.vertices[src]; !ok {
+		return VertexUnknownError{src}
+	}
+	if _, ok := d.vertices[dst]; !ok {
+		return VertexUnknownError{dst}
+	}
+	if value, exists := d.outboundEdge[src][dst]; !exists || !value {
+		return EdgeUnknownError{src, dst}
+	}
+
+	d.muDAG.RUnlock()
+	d.muDAG.Lock()
+
+	// delete outbound
+	delete(d.outboundEdge[src], dst)
+
+	// delete inbound
+	delete(d.inboundEdge[dst], src)
+
+	//// for src and all its descendants delete cached ancestors
+	//for descendant := range descendants {
+	//	if _, exists := d.ancestorsCache[descendant]; exists {
+	//		delete(d.ancestorsCache, descendant)
+	//	}
+	//}
+	//delete(d.ancestorsCache, src)
+	//
+	//// for dst and all its ancestors delete cached descendants
+	//for ancestor := range ancestors {
+	//	if _, exists := d.descendantsCache[ancestor]; exists {
+	//		delete(d.descendantsCache, ancestor)
+	//	}
+	//}
+	//delete(d.descendantsCache, dst)
+
+
+	// recompute ancestors of dst recursively.
+	d.recomputeAncestors(dst)
+
+	// recompute descendants of src recursively.
+	d.recomputeDescendants(src)
+
+	d.muDAG.Unlock()
+
+	return nil
+}
+
+
+// DeleteVertex deletes the vertex v from the DAG. DeleteVertex returns an
+// error, if v is nil or v unknown.
 func (d *DAG) DeleteVertex(v Vertex) error {
 
 	// sanity checking
@@ -97,193 +262,68 @@ func (d *DAG) DeleteVertex(v Vertex) error {
 		return VertexUnknownError{v}
 	}
 
-	// get descendents and ancestors as they are now
-	descendants, _ := d.GetDescendants(v)
-	ancestors, _ := d.GetAncestors(v)
-
 	d.muDAG.Lock()
 
-	// delete v in outbound edges of parents
-	if _, exists := d.inboundEdge[v]; exists {
-		for parent := range d.inboundEdge[v] {
-			delete(d.outboundEdge[parent], v)
-		}
+	// compute the list of parents of v
+	parents := map2list(d.inboundEdge[v])
+
+	// compute the list of childs of v
+	childs := map2list(d.outboundEdge[v])
+
+	// for all parents
+	for _, parent := range parents {
+
+		// delete the outbound edge to v
+		delete(d.outboundEdge[parent], v)
 	}
 
-	// delete v in inbound edges of children
-	if _, exists := d.outboundEdge[v]; exists {
-		for child := range d.outboundEdge[v] {
-			delete(d.inboundEdge[child], v)
-		}
+	// for all childs
+	for _, child := range childs {
+
+		// delete the inbound edge from v
+		delete(d.inboundEdge[child], v)
 	}
 
 	// delete in- and outbound of v itself
 	delete(d.inboundEdge, v)
 	delete(d.outboundEdge, v)
 
-	// for v and all its descendants delete cached ancestors
-	for descendant := range descendants {
-		if _, exists := d.ancestorsCache[descendant]; exists {
-			delete(d.ancestorsCache, descendant)
-		}
-	}
-	delete(d.ancestorsCache, v)
-
-	// for v and all its ancestors delete cached descendants
-	for ancestor := range ancestors {
-		if _, exists := d.descendantsCache[ancestor]; exists {
-			delete(d.descendantsCache, ancestor)
-		}
-	}
-	delete(d.descendantsCache, v)
-
 	// delete v itself
 	delete(d.vertices, v)
 	delete(d.vertexIds, v.Id())
 
-	d.muDAG.Unlock()
 
-	return nil
-}
+	//// for src and all its descendants delete cached ancestors
+	//for descendant := range descendants {
+	//	if _, exists := d.ancestorsCache[descendant]; exists {
+	//		delete(d.ancestorsCache, descendant)
+	//	}
+	//}
+	//delete(d.ancestorsCache, src)
+	//
+	//// for dst and all its ancestors delete cached descendants
+	//for ancestor := range ancestors {
+	//	if _, exists := d.descendantsCache[ancestor]; exists {
+	//		delete(d.descendantsCache, ancestor)
+	//	}
+	//}
+	//delete(d.descendantsCache, dst)
 
-// Add an edge while preventing circles.
-func (d *DAG) AddEdge(src Vertex, dst Vertex) error {
 
-	// sanity checking
-	if src == nil {
-		return VertexNilError{}
-	}
-	if dst == nil {
-		return VertexNilError{}
-	}
+	// for all parents
+	for _, parent := range parents {
 
-	// ensure vertices
-	if !d.vertices[src] {
-		d.AddVertex(src)
-	}
-	if !d.vertices[dst] {
-		d.AddVertex(dst)
-	}
+		// recompute descendants of parent recursively.
+		d.recomputeDescendants(parent)
 
-	// test / compute edge nodes and the edge itself
-	d.muDAG.RLock()
-	_, outboundExists := d.outboundEdge[src]
-	_, inboundExists := d.inboundEdge[dst]
-	edgeKnown := outboundExists && d.outboundEdge[src][dst] && inboundExists && d.inboundEdge[dst][src]
-	d.muDAG.RUnlock()
-
-	// if the edge is already known, there is nothing else to do
-	if edgeKnown {
-		return EdgeDuplicateError{src, dst}
 	}
 
-	// get descendents and ancestors as they are now
-	descendants, _ := d.GetDescendants(dst)
-	ancestors, _ := d.GetAncestors(src)
+	// for all childs
+	for _, child := range childs {
 
-	// check for circles, iff desired
-	if src == dst || descendants[src] {
-		return EdgeLoopError{src, dst}
+		// recompute ancestors of child recursively.
+		d.recomputeAncestors(child)
 	}
-
-	d.muDAG.Lock()
-
-	// prepare d.outbound[src], iff needed
-	if !outboundExists {
-		d.outboundEdge[src] = make(map[Vertex]bool)
-	}
-
-	// dst is a child of src
-	d.outboundEdge[src][dst] = true
-
-	// prepare d.inboundEdge[dst], iff needed
-	if !inboundExists {
-		d.inboundEdge[dst] = make(map[Vertex]bool)
-	}
-
-	// src is a parent of dst
-	d.inboundEdge[dst][src] = true
-
-	// for dst and all its descendants delete cached ancestors
-	for descendant := range descendants {
-		if _, exists := d.ancestorsCache[descendant]; exists {
-			delete(d.ancestorsCache, descendant)
-		}
-	}
-	delete(d.ancestorsCache, dst)
-
-	// for src and all its ancestors delete cached descendants
-	for ancestor := range ancestors {
-		if _, exists := d.descendantsCache[ancestor]; exists {
-			delete(d.descendantsCache, ancestor)
-		}
-	}
-	delete(d.descendantsCache, src)
-
-	d.muDAG.Unlock()
-
-	return nil
-}
-
-// Delete an edge.
-func (d *DAG) DeleteEdge(src Vertex, dst Vertex) error {
-
-	// sanity checking
-	if src == nil {
-		return VertexNilError{}
-	}
-	if dst == nil {
-		return VertexNilError{}
-	}
-
-	d.muDAG.RLock()
-	if _, ok := d.vertices[src]; !ok {
-		return VertexUnknownError{src}
-	}
-	if _, ok := d.vertices[dst]; !ok {
-		return VertexUnknownError{dst}
-	}
-
-	// test / compute edge nodes
-	_, outboundExists := d.outboundEdge[src][dst]
-	_, inboundExists := d.inboundEdge[dst][src]
-	d.muDAG.RUnlock()
-
-	if !inboundExists || !outboundExists {
-		return EdgeUnknownError{src, dst}
-	}
-
-	// get descendents and ancestors as they are now
-	descendants, _ := d.GetDescendants(src)
-	ancestors, _ := d.GetAncestors(dst)
-
-	d.muDAG.Lock()
-
-	// delete outbound
-	if outboundExists {
-		delete(d.outboundEdge[src], dst)
-	}
-
-	// delete inbound
-	if inboundExists {
-		delete(d.inboundEdge[dst], src)
-	}
-
-	// for src and all its descendants delete cached ancestors
-	for descendant := range descendants {
-		if _, exists := d.ancestorsCache[descendant]; exists {
-			delete(d.ancestorsCache, descendant)
-		}
-	}
-	delete(d.ancestorsCache, src)
-
-	// for dst and all its ancestors delete cached descendants
-	for ancestor := range ancestors {
-		if _, exists := d.descendantsCache[ancestor]; exists {
-			delete(d.descendantsCache, ancestor)
-		}
-	}
-	delete(d.descendantsCache, dst)
 
 	d.muDAG.Unlock()
 
@@ -381,6 +421,29 @@ func (d *DAG) GetParents(v Vertex) (map[Vertex]bool, error) {
 
 	return copyMap(d.inboundEdge[v]), nil
 }
+
+func (d *DAG) recomputeAncestors(v Vertex) {
+	ancestors := make(map[Vertex]bool)
+	for parent := range d.inboundEdge[v] {
+		d.recomputeAncestors(parent)
+		for ancestor := range d.ancestors[parent] {
+			ancestors[ancestor] = true
+		}
+	}
+	d.ancestors[v] = ancestors
+}
+
+func (d *DAG) recomputeDescendants(v Vertex) {
+	descendants := make(map[Vertex]bool)
+	for child := range d.outboundEdge[v] {
+		d.recomputeDescendants(child)
+		for descendant := range d.descendants[child] {
+			descendants[descendant] = true
+		}
+	}
+	d.descendants[v] = descendants
+}
+
 
 func (d *DAG) getAncestorsAux(v Vertex) map[Vertex]bool {
 
@@ -773,6 +836,17 @@ type EdgeLoopError struct {
 // Implements the error interface.
 func (e EdgeLoopError) Error() string {
 	return fmt.Sprintf("edge between '%s' and '%s' would create a loop", e.src.String(), e.dst.String())
+}
+
+// Error type to describe the situation, that src and dst are equal.
+type SrcDstEqualError struct {
+	src Vertex
+	dst Vertex
+}
+
+// Implements the error interface.
+func (e SrcDstEqualError) Error() string {
+	return fmt.Sprintf("src ('%s') and dst ('%s') equal", e.src.String(), e.dst.String())
 }
 
 /***************************
