@@ -175,15 +175,8 @@ func (d *DAG) AddEdge(src Vertex, dst Vertex) error {
 		}
 	}
 
-	// test / compute edge nodes and the edge itself
-	d.muDAG.RLock()
-	_, outboundExists := d.outboundEdge[src]
-	_, inboundExists := d.inboundEdge[dst]
-	edgeKnown := outboundExists && d.outboundEdge[src][dst] && inboundExists && d.inboundEdge[dst][src]
-	d.muDAG.RUnlock()
-
 	// if the edge is already known, there is nothing else to do
-	if edgeKnown {
+	if d.isEdge(src, dst) {
 		return EdgeDuplicateError{src, dst}
 	}
 
@@ -199,7 +192,7 @@ func (d *DAG) AddEdge(src Vertex, dst Vertex) error {
 	d.muDAG.Lock()
 
 	// prepare d.outbound[src], iff needed
-	if !outboundExists {
+	if _, exists := d.outboundEdge[src]; !exists {
 		d.outboundEdge[src] = make(map[Vertex]bool)
 	}
 
@@ -207,7 +200,7 @@ func (d *DAG) AddEdge(src Vertex, dst Vertex) error {
 	d.outboundEdge[src][dst] = true
 
 	// prepare d.inboundEdge[dst], iff needed
-	if !inboundExists {
+	if _, exists := d.inboundEdge[dst]; !exists {
 		d.inboundEdge[dst] = make(map[Vertex]bool)
 	}
 
@@ -235,35 +228,45 @@ func (d *DAG) AddEdge(src Vertex, dst Vertex) error {
 	return nil
 }
 
+// IsEdge returns true, if there exists an edge between src and dst. IsEdge
+// returns false if there is no such edge. IsEdge returns an error, if src or
+// dst are nil, unknown or the same.
+func (d *DAG) IsEdge(src Vertex, dst Vertex) (bool, error) {
+
+	if err := d.saneVertex(src); err != nil {
+		return false, err
+	}
+	if err := d.saneVertex(dst); err != nil {
+		return false, err
+	}
+	if src == dst {
+		return false, SrcDstEqualError{src, dst}
+	}
+
+	return d.isEdge(src, dst), nil
+}
+
+func (d *DAG) isEdge(src Vertex, dst Vertex) bool {
+	d.muDAG.RLock()
+	defer d.muDAG.RUnlock()
+
+	_, outboundExists := d.outboundEdge[src]
+	_, inboundExists := d.inboundEdge[dst]
+
+	return outboundExists && d.outboundEdge[src][dst] &&
+		inboundExists && d.inboundEdge[dst][src]
+}
+
 // DeleteEdge deletes an edge. DeleteEdge also deletes ancestor- and
 // descendant-caches of related vertices. DeleteEdge returns an error, if src
 // or dst are nil or unknown, or if there is no edge between src and dst.
 func (d *DAG) DeleteEdge(src Vertex, dst Vertex) error {
 
-	// sanity checking
-	if src == nil || dst == nil {
-		return VertexNilError{}
+	isEdge, err := d.IsEdge(src, dst)
+	if err != nil {
+		return err
 	}
-
-	// check for equality
-	if src == dst {
-		return SrcDstEqualError{src, dst}
-	}
-
-	d.muDAG.RLock()
-	if _, ok := d.vertices[src]; !ok {
-		return VertexUnknownError{src}
-	}
-	if _, ok := d.vertices[dst]; !ok {
-		return VertexUnknownError{dst}
-	}
-
-	// test / compute edge nodes
-	_, outboundExists := d.outboundEdge[src][dst]
-	_, inboundExists := d.inboundEdge[dst][src]
-	d.muDAG.RUnlock()
-
-	if !inboundExists || !outboundExists {
+	if !isEdge {
 		return EdgeUnknownError{src, dst}
 	}
 
@@ -273,15 +276,9 @@ func (d *DAG) DeleteEdge(src Vertex, dst Vertex) error {
 
 	d.muDAG.Lock()
 
-	// delete outbound
-	if outboundExists {
-		delete(d.outboundEdge[src], dst)
-	}
-
-	// delete inbound
-	if inboundExists {
-		delete(d.inboundEdge[dst], src)
-	}
+	// delete outbound and inbound
+	delete(d.outboundEdge[src], dst)
+	delete(d.inboundEdge[dst], src)
 
 	// for src and all its descendants delete cached ancestors
 	for descendant := range descendants {
@@ -524,7 +521,7 @@ func (d *DAG) walkAncestors(v Vertex, vertices chan Vertex, signal chan bool) {
 // GetDescendants return all ancestors of the vertex v. GetDescendants returns
 // an error, if v is nil or unknown.
 //
-// Note, in order to get the ancestors, GetDescendants populates the
+// Note, in order to get the descendants, GetDescendants populates the
 // descendants-cache as needed. Depending on order and size of the sub-graph of
 // v this may take a long time and consume a lot of memory.
 func (d *DAG) GetDescendants(v Vertex) (map[Vertex]bool, error) {
@@ -656,6 +653,46 @@ func (d *DAG) walkDescendants(v Vertex, vertices chan Vertex, signal chan bool) 
 			return
 		default:
 			vertices <- top
+		}
+	}
+}
+
+// ReduceTransitively transitively reduce the graph.
+//
+// Note, in order to do the reduction the descendant-cache of all vertices is
+// populated (i.e. the transitive closure). Depending on order and size of DAG
+// this may take a long time and consume a lot of memory.
+func (d *DAG) ReduceTransitively() {
+
+	// populate the descendents cache for all roots (i.e. the whole graph)
+	for root := range d.GetRoots() {
+		_ = d.getDescendants(root)
+	}
+
+	// for each vertex
+	for v := range d.vertices {
+
+		// map of descendants of the children of v
+		descendentsOfChildrenOfV := make(map[Vertex]bool)
+
+		// for each child of v
+		for childOfV := range d.outboundEdge[v] {
+
+			// collect child descendants
+			for descendent := range d.descendantsCache[childOfV] {
+				descendentsOfChildrenOfV[descendent] = true
+			}
+		}
+
+		// for each child of v
+		for childOfV := range d.outboundEdge[v] {
+
+			// remove the edge between v and child, iff child is a
+			// descendants of any of the children of v
+			if descendentsOfChildrenOfV[childOfV] {
+				delete(d.outboundEdge[v], childOfV)
+				delete(d.inboundEdge[childOfV], v)
+			}
 		}
 	}
 }

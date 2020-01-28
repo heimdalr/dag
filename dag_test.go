@@ -5,18 +5,32 @@ import (
 	"testing"
 )
 
-type myVertex struct {
+type iVertex struct {
 	value int
 }
 
 // implement the Vertex's interface method String()
-func (v myVertex) String() string {
+func (v iVertex) String() string {
 	return fmt.Sprintf("%d", v.value)
 }
 
 // implement the Vertex's interface method Id()
-func (v myVertex) Id() string {
+func (v iVertex) Id() string {
 	return fmt.Sprintf("%d", v.value)
+}
+
+type sVertex struct {
+	value string
+}
+
+// implement the Vertex's interface method String()
+func (v sVertex) String() string {
+	return fmt.Sprintf("%s", v.value)
+}
+
+// implement the Vertex's interface method Id()
+func (v sVertex) Id() string {
+	return fmt.Sprintf("%s", v.value)
 }
 
 func TestNewDAG(t *testing.T) {
@@ -33,7 +47,7 @@ func TestDAG_AddVertex(t *testing.T) {
 	dag := NewDAG()
 
 	// add a single vertex and inspect the graph
-	v := &myVertex{1}
+	v := &iVertex{1}
 	_ = dag.AddVertex(v)
 	if order := dag.GetOrder(); order != 1 {
 		t.Errorf("GetOrder() = %d, want 1", order)
@@ -76,7 +90,7 @@ func TestDAG_AddVertex(t *testing.T) {
 
 func TestDAG_GetVertex(t *testing.T) {
 	dag := NewDAG()
-	v1 := &myVertex{1}
+	v1 := &iVertex{1}
 	id := v1.String()
 	_ = dag.AddVertex(v1)
 	if v, _ := dag.GetVertex(id); v != v1 {
@@ -104,9 +118,9 @@ func TestDAG_GetVertex(t *testing.T) {
 
 func TestDAG_DeleteVertex(t *testing.T) {
 	dag := NewDAG()
-	v1 := &myVertex{1}
-	v2 := &myVertex{2}
-	v3 := &myVertex{3}
+	v1 := &iVertex{1}
+	v2 := &iVertex{2}
+	v3 := &iVertex{3}
 	_ = dag.AddVertex(v1)
 
 	// delete a single vertex and inspect the graph
@@ -175,7 +189,7 @@ func TestDAG_DeleteVertex(t *testing.T) {
 	}
 
 	// unknown
-	foo := &myVertex{-1}
+	foo := &iVertex{-1}
 	errUnknown := dag.DeleteVertex(foo)
 	if errUnknown == nil {
 		t.Errorf("DeleteVertex(foo) = nil, want %T", VertexUnknownError{foo})
@@ -196,10 +210,10 @@ func TestDAG_DeleteVertex(t *testing.T) {
 
 func TestDAG_AddEdge(t *testing.T) {
 	dag := NewDAG()
-	v0 := &myVertex{0}
-	v1 := &myVertex{1}
-	v2 := &myVertex{2}
-	v3 := &myVertex{3}
+	v0 := &iVertex{0}
+	v1 := &iVertex{1}
+	v2 := &iVertex{2}
+	v3 := &iVertex{3}
 
 	// add a single edge and inspect the graph
 	_ = dag.AddEdge(v1, v2)
@@ -285,8 +299,8 @@ func TestDAG_AddEdge(t *testing.T) {
 
 func TestDAG_DeleteEdge(t *testing.T) {
 	dag := NewDAG()
-	v0 := &myVertex{0}
-	v1 := &myVertex{1}
+	v0 := &iVertex{0}
+	v1 := &iVertex{1}
 	_ = dag.AddEdge(v0, v1)
 	if size := dag.GetSize(); size != 1 {
 		t.Errorf("GetSize() = %d, want 1", size)
@@ -322,7 +336,7 @@ func TestDAG_DeleteEdge(t *testing.T) {
 	}
 
 	// unknown
-	foo := &myVertex{-1}
+	foo := &iVertex{-1}
 	errUnknownSrc := dag.DeleteEdge(foo, v1)
 	if errUnknownSrc == nil {
 		t.Errorf("DeleteEdge(foo, v1) = nil, want %T", VertexUnknownError{})
@@ -341,10 +355,10 @@ func TestDAG_DeleteEdge(t *testing.T) {
 
 func TestDAG_GetChildren(t *testing.T) {
 	dag := NewDAG()
-	v1 := &myVertex{1}
-	v2 := &myVertex{2}
-	v3 := &myVertex{3}
-	v4 := &myVertex{4}
+	v1 := &iVertex{1}
+	v2 := &iVertex{2}
+	v3 := &iVertex{3}
+	v4 := &iVertex{4}
 	_ = dag.AddEdge(v1, v2)
 	_ = dag.AddEdge(v1, v3)
 
@@ -380,10 +394,10 @@ func TestDAG_GetChildren(t *testing.T) {
 
 func TestDAG_GetParents(t *testing.T) {
 	dag := NewDAG()
-	v1 := &myVertex{1}
-	v2 := &myVertex{2}
-	v3 := &myVertex{3}
-	v4 := &myVertex{4}
+	v1 := &iVertex{1}
+	v2 := &iVertex{2}
+	v3 := &iVertex{3}
+	v4 := &iVertex{4}
 	_ = dag.AddEdge(v1, v3)
 	_ = dag.AddEdge(v2, v3)
 
@@ -420,11 +434,11 @@ func TestDAG_GetParents(t *testing.T) {
 
 func TestDAG_GetDescendants(t *testing.T) {
 	dag := NewDAG()
-	v1 := &myVertex{1}
-	v2 := &myVertex{2}
-	v3 := &myVertex{3}
-	v4 := &myVertex{4}
-	v5 := &myVertex{5}
+	v1 := &iVertex{1}
+	v2 := &iVertex{2}
+	v3 := &iVertex{3}
+	v4 := &iVertex{4}
+	v5 := &iVertex{5}
 	_ = dag.AddEdge(v1, v2)
 	_ = dag.AddEdge(v2, v3)
 	_ = dag.AddEdge(v2, v4)
@@ -475,11 +489,11 @@ func Equal(a, b []Vertex) bool {
 
 func TestDAG_GetOrderedDescendants(t *testing.T) {
 	dag := NewDAG()
-	v1 := &myVertex{1}
-	v2 := &myVertex{2}
-	v3 := &myVertex{3}
-	v4 := &myVertex{4}
-	v5 := &myVertex{5}
+	v1 := &iVertex{1}
+	v2 := &iVertex{2}
+	v3 := &iVertex{3}
+	v4 := &iVertex{4}
+	v5 := &iVertex{5}
 	_ = dag.AddEdge(v1, v2)
 	_ = dag.AddEdge(v2, v3)
 	_ = dag.AddEdge(v2, v4)
@@ -521,14 +535,14 @@ func TestDAG_GetOrderedDescendants(t *testing.T) {
 
 func TestDAG_GetAncestors(t *testing.T) {
 	dag := NewDAG()
-	v0 := &myVertex{0}
-	v1 := &myVertex{1}
-	v2 := &myVertex{2}
-	v3 := &myVertex{3}
-	v4 := &myVertex{4}
-	v5 := &myVertex{5}
-	v6 := &myVertex{6}
-	v7 := &myVertex{7}
+	v0 := &iVertex{0}
+	v1 := &iVertex{1}
+	v2 := &iVertex{2}
+	v3 := &iVertex{3}
+	v4 := &iVertex{4}
+	v5 := &iVertex{5}
+	v6 := &iVertex{6}
+	v7 := &iVertex{7}
 
 	_ = dag.AddEdge(v1, v2)
 	_ = dag.AddEdge(v2, v3)
@@ -579,7 +593,7 @@ func TestDAG_GetAncestors(t *testing.T) {
 	}
 
 	// unknown
-	foo := &myVertex{-1}
+	foo := &iVertex{-1}
 	_, errUnknown := dag.GetAncestors(foo)
 	if errUnknown == nil {
 		t.Errorf("GetAncestors(foo) = nil, want %T", VertexUnknownError{foo})
@@ -592,11 +606,11 @@ func TestDAG_GetAncestors(t *testing.T) {
 
 func TestDAG_GetOrderedAncestors(t *testing.T) {
 	dag := NewDAG()
-	v1 := &myVertex{1}
-	v2 := &myVertex{2}
-	v3 := &myVertex{3}
-	v4 := &myVertex{4}
-	v5 := &myVertex{5}
+	v1 := &iVertex{1}
+	v2 := &iVertex{2}
+	v3 := &iVertex{3}
+	v4 := &iVertex{4}
+	v5 := &iVertex{5}
 	_ = dag.AddEdge(v1, v2)
 	_ = dag.AddEdge(v2, v3)
 	_ = dag.AddEdge(v2, v4)
@@ -635,17 +649,17 @@ func TestDAG_GetOrderedAncestors(t *testing.T) {
 
 func TestDAG_AncestorsWalker(t *testing.T) {
 	dag := NewDAG()
-	v1 := &myVertex{1}
-	v2 := &myVertex{2}
-	v3 := &myVertex{3}
-	v4 := &myVertex{4}
-	v5 := &myVertex{5}
-	v6 := &myVertex{6}
-	v7 := &myVertex{7}
-	v8 := &myVertex{8}
-	v9 := &myVertex{9}
-	v10 := &myVertex{10}
-	foo := &myVertex{-1}
+	v1 := &iVertex{1}
+	v2 := &iVertex{2}
+	v3 := &iVertex{3}
+	v4 := &iVertex{4}
+	v5 := &iVertex{5}
+	v6 := &iVertex{6}
+	v7 := &iVertex{7}
+	v8 := &iVertex{8}
+	v9 := &iVertex{9}
+	v10 := &iVertex{10}
+	foo := &iVertex{-1}
 
 	_ = dag.AddEdge(v1, v2)
 	_ = dag.AddEdge(v1, v3)
@@ -694,11 +708,11 @@ func TestDAG_AncestorsWalker(t *testing.T) {
 func TestDAG_AncestorsWalkerSignal(t *testing.T) {
 	dag := NewDAG()
 
-	v1 := &myVertex{1}
-	v2 := &myVertex{2}
-	v3 := &myVertex{3}
-	v4 := &myVertex{4}
-	v5 := &myVertex{5}
+	v1 := &iVertex{1}
+	v2 := &iVertex{2}
+	v3 := &iVertex{3}
+	v4 := &iVertex{4}
+	v5 := &iVertex{5}
 	_ = dag.AddEdge(v1, v2)
 	_ = dag.AddEdge(v2, v3)
 	_ = dag.AddEdge(v2, v4)
@@ -719,12 +733,65 @@ func TestDAG_AncestorsWalkerSignal(t *testing.T) {
 
 }
 
+func TestDAG_TransitiveReduction(t *testing.T) {
+	dag := NewDAG()
+	accountCreate := &sVertex{"AccountCreate"}
+	projectCreate := &sVertex{"ProjectCreate"}
+	networkCreate := &sVertex{"NetworkCreate"}
+	contactCreate := &sVertex{"ContactCreate"}
+	authzCreate := &sVertex{"AuthzCreate"}
+	mailSend := &sVertex{"MailSend"}
+
+	_ = dag.AddEdge(accountCreate, projectCreate)
+	_ = dag.AddEdge(accountCreate, networkCreate)
+	_ = dag.AddEdge(accountCreate, contactCreate)
+	_ = dag.AddEdge(accountCreate, authzCreate)
+	_ = dag.AddEdge(accountCreate, mailSend)
+
+	_ = dag.AddEdge(projectCreate, mailSend)
+	_ = dag.AddEdge(networkCreate, mailSend)
+	_ = dag.AddEdge(contactCreate, mailSend)
+	_ = dag.AddEdge(authzCreate, mailSend)
+
+	if order := dag.GetOrder(); order != 6 {
+		t.Errorf("GetOrder() = %d, want 6", order)
+	}
+	if size := dag.GetSize(); size != 9 {
+		t.Errorf("GetSize() = %d, want 9", size)
+	}
+	if isEdge, _ := dag.IsEdge(accountCreate, mailSend); !isEdge {
+		t.Errorf("IsEdge(accountCreate, mailSend) = %t, want %t", isEdge, true)
+	}
+
+	dag.ReduceTransitively()
+
+	if order := dag.GetOrder(); order != 6 {
+		t.Errorf("GetOrder() = %d, want 6", order)
+	}
+	if size := dag.GetSize(); size != 8 {
+		t.Errorf("GetSize() = %d, want 8", size)
+	}
+	if isEdge, _ := dag.IsEdge(accountCreate, mailSend); isEdge {
+		t.Errorf("IsEdge(accountCreate, mailSend) = %t, want %t", isEdge, false)
+	}
+
+	ordered, _ := dag.GetOrderedDescendants(accountCreate)
+	length := len(ordered)
+	if length != 5 {
+		t.Errorf("length(ordered) = %d, want 5", length)
+	}
+	last := ordered[length-1]
+	if last != mailSend {
+		t.Errorf("ordered[length-1]) = %s, want %s", last, mailSend.String())
+	}
+}
+
 func TestDAG_String(t *testing.T) {
 	dag := NewDAG()
-	v1 := &myVertex{1}
-	v2 := &myVertex{2}
-	v3 := &myVertex{3}
-	v4 := &myVertex{4}
+	v1 := &iVertex{1}
+	v2 := &iVertex{2}
+	v3 := &iVertex{3}
+	v4 := &iVertex{4}
 	_ = dag.AddEdge(v1, v2)
 	_ = dag.AddEdge(v2, v3)
 	_ = dag.AddEdge(v2, v4)
@@ -736,8 +803,8 @@ func TestDAG_String(t *testing.T) {
 }
 
 func TestErrors(t *testing.T) {
-	v1 := &myVertex{1}
-	v2 := &myVertex{2}
+	v1 := &iVertex{1}
+	v2 := &iVertex{2}
 
 	tests := []struct {
 		want string
@@ -765,9 +832,9 @@ func Example() {
 	d := NewDAG()
 
 	// init three vertices
-	v1 := &myVertex{1}
-	v2 := &myVertex{2}
-	v3 := &myVertex{3}
+	v1 := &iVertex{1}
+	v2 := &iVertex{2}
+	v3 := &iVertex{3}
 
 	// add the above vertices and connect them with two edges
 	_ = d.AddEdge(v1, v2)
@@ -790,11 +857,11 @@ func Example() {
 func ExampleDAG_AncestorsWalker() {
 	dag := NewDAG()
 
-	v1 := &myVertex{1}
-	v2 := &myVertex{2}
-	v3 := &myVertex{3}
-	v4 := &myVertex{4}
-	v5 := &myVertex{5}
+	v1 := &iVertex{1}
+	v2 := &iVertex{2}
+	v3 := &iVertex{3}
+	v4 := &iVertex{4}
+	v5 := &iVertex{5}
 	_ = dag.AddEdge(v1, v2)
 	_ = dag.AddEdge(v2, v3)
 	_ = dag.AddEdge(v2, v4)
@@ -817,7 +884,7 @@ func ExampleDAG_AncestorsWalker() {
 
 func TestLarge(t *testing.T) {
 	d := NewDAG()
-	root := &myVertex{1}
+	root := &iVertex{1}
 	levels := 7
 	branches := 8
 
@@ -853,7 +920,7 @@ func TestLarge(t *testing.T) {
 	*/
 }
 
-func largeAux(d *DAG, level int, branches int, parent *myVertex) (int, int) {
+func largeAux(d *DAG, level int, branches int, parent *iVertex) (int, int) {
 	var vertexCount int
 	var edgeCount int
 	if level > 1 {
@@ -862,7 +929,7 @@ func largeAux(d *DAG, level int, branches int, parent *myVertex) (int, int) {
 		}
 		for i := 1; i <= branches; i++ {
 			value := (*parent).value*10 + i
-			child := &myVertex{value}
+			child := &iVertex{value}
 			vertexCount++
 			err := d.AddEdge(parent, child)
 			edgeCount++
