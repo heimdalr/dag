@@ -93,15 +93,8 @@ func (d *DAG) GetVertex(id string) (Vertex, error) {
 // related vertices. DeleteVertex returns an error, if v is nil or unknown.
 func (d *DAG) DeleteVertex(v Vertex) error {
 
-	// sanity checking
-	if v == nil {
-		return VertexNilError{}
-	}
-	d.muDAG.RLock()
-	_, exists := d.vertices[v]
-	d.muDAG.RUnlock()
-	if !exists {
-		return VertexUnknownError{v}
+	if err := d.saneVertex(v); err != nil {
+		return err
 	}
 
 	// get descendents and ancestors as they are now
@@ -376,32 +369,22 @@ func (d *DAG) GetVertices() map[Vertex]bool {
 // if v is nil or unknown.
 func (d *DAG) GetChildren(v Vertex) (map[Vertex]bool, error) {
 
-	// sanity checking
-	if v == nil {
-		return nil, VertexNilError{}
+	if err := d.saneVertex(v); err != nil {
+		return nil, err
 	}
 	d.muDAG.RLock()
 	defer d.muDAG.RUnlock()
-	if _, ok := d.vertices[v]; !ok {
-		return nil, VertexUnknownError{v}
-	}
-
 	return copyMap(d.outboundEdge[v]), nil
 }
 
 // GetParents returns all parents of vertex v. GetParents returns an error,
 // if v is nil or unknown.
 func (d *DAG) GetParents(v Vertex) (map[Vertex]bool, error) {
-	// sanity checking
-	if v == nil {
-		return nil, VertexNilError{}
+	if err := d.saneVertex(v); err != nil {
+		return nil, err
 	}
 	d.muDAG.RLock()
 	defer d.muDAG.RUnlock()
-	if _, ok := d.vertices[v]; !ok {
-		return nil, VertexUnknownError{v}
-	}
-
 	return copyMap(d.inboundEdge[v]), nil
 }
 
@@ -461,17 +444,9 @@ func (d *DAG) getAncestors(v Vertex) map[Vertex]bool {
 // take a long time and consume a lot of memory.
 func (d *DAG) GetAncestors(v Vertex) (map[Vertex]bool, error) {
 
-	// sanity checking
-	if v == nil {
-		return nil, VertexNilError{}
+	if err := d.saneVertex(v); err != nil {
+		return nil, err
 	}
-	d.muDAG.RLock()
-	_, ok := d.vertices[v]
-	d.muDAG.RUnlock()
-	if !ok {
-		return nil, VertexUnknownError{v}
-	}
-
 	return copyMap(d.getAncestors(v)), nil
 }
 
@@ -483,16 +458,10 @@ func (d *DAG) GetAncestors(v Vertex) (map[Vertex]bool, error) {
 // GetOrderedAncestors may return different results.
 func (d *DAG) GetOrderedAncestors(v Vertex) ([]Vertex, error) {
 
-	// sanity checking
-	if v == nil {
-		return nil, VertexNilError{}
+	vertices, _, err := d.AncestorsWalker(v)
+	if err != nil {
+		return nil, err
 	}
-	d.muDAG.RLock()
-	defer d.muDAG.RUnlock()
-	if _, ok := d.vertices[v]; !ok {
-		return nil, VertexUnknownError{v}
-	}
-	vertices, _, _ := d.AncestorsWalker(v)
 	var ancestors []Vertex
 	for v := range vertices {
 		ancestors = append(ancestors, v)
@@ -537,16 +506,9 @@ func (d *DAG) walkAncestors(v Vertex, vertices chan Vertex, signal chan bool) {
 // Note, there is no order between sibling vertices. Two consecutive runs of
 // AncestorsWalker may return different results.
 func (d *DAG) AncestorsWalker(v Vertex) (chan Vertex, chan bool, error) {
-	// sanity checking
-	if v == nil {
-		return nil, nil, VertexNilError{}
+	if err := d.saneVertex(v); err != nil {
+		return nil, nil, err
 	}
-	d.muDAG.RLock()
-	if _, ok := d.vertices[v]; !ok {
-		return nil, nil, VertexUnknownError{v}
-	}
-	d.muDAG.RUnlock()
-
 	vertices := make(chan Vertex)
 	signal := make(chan bool, 1)
 	go func() {
@@ -567,16 +529,10 @@ func (d *DAG) AncestorsWalker(v Vertex) (chan Vertex, chan bool, error) {
 // GetOrderedDescendants may return different results.
 func (d *DAG) GetOrderedDescendants(v Vertex) ([]Vertex, error) {
 
-	// sanity checking
-	if v == nil {
-		return nil, VertexNilError{}
+	vertices, _, err := d.DescendantsWalker(v)
+	if err != nil {
+		return nil, err
 	}
-	d.muDAG.RLock()
-	defer d.muDAG.RUnlock()
-	if _, ok := d.vertices[v]; !ok {
-		return nil, VertexUnknownError{v}
-	}
-	vertices, _, _ := d.DescendantsWalker(v)
 	var descendants []Vertex
 	for v := range vertices {
 		descendants = append(descendants, v)
@@ -646,17 +602,9 @@ func (d *DAG) getDescendants(v Vertex) map[Vertex]bool {
 // v this may take a long time and consume a lot of memory.
 func (d *DAG) GetDescendants(v Vertex) (map[Vertex]bool, error) {
 
-	// sanity checking
-	if v == nil {
-		return nil, VertexNilError{}
+	if err := d.saneVertex(v); err != nil {
+		return nil, err
 	}
-	d.muDAG.RLock()
-	_, ok := d.vertices[v]
-	d.muDAG.RUnlock()
-	if !ok {
-		return nil, VertexUnknownError{v}
-	}
-
 	return copyMap(d.getDescendants(v)), nil
 }
 
@@ -697,16 +645,9 @@ func (d *DAG) walkDescendants(v Vertex, vertices chan Vertex, signal chan bool) 
 // Note, there is no order between sibling vertices. Two consecutive runs of
 // DescendantsWalker may return different results.
 func (d *DAG) DescendantsWalker(v Vertex) (chan Vertex, chan bool, error) {
-	// sanity checking
-	if v == nil {
-		return nil, nil, VertexNilError{}
+	if err := d.saneVertex(v); err != nil {
+		return nil, nil, err
 	}
-	d.muDAG.RLock()
-	if _, ok := d.vertices[v]; !ok {
-		return nil, nil, VertexUnknownError{v}
-	}
-	d.muDAG.RUnlock()
-
 	vertices := make(chan Vertex)
 	signal := make(chan bool, 1)
 	go func() {
@@ -735,6 +676,20 @@ func (d *DAG) String() string {
 	}
 	d.muDAG.RUnlock()
 	return result
+}
+
+func (d *DAG) saneVertex(v Vertex) error {
+	// sanity checking
+	if v == nil {
+		return VertexNilError{}
+	}
+	d.muDAG.RLock()
+	_, exists := d.vertices[v]
+	d.muDAG.RUnlock()
+	if !exists {
+		return VertexUnknownError{v}
+	}
+	return nil
 }
 
 /***************************
