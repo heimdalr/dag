@@ -733,7 +733,7 @@ func TestDAG_AncestorsWalkerSignal(t *testing.T) {
 
 }
 
-func TestDAG_TransitiveReduction(t *testing.T) {
+func TestDAG_ReduceTransitively(t *testing.T) {
 	dag := NewDAG()
 	accountCreate := &sVertex{"AccountCreate"}
 	projectCreate := &sVertex{"ProjectCreate"}
