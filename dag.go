@@ -475,7 +475,7 @@ func (d *DAG) GetAncestors(v Vertex) (map[Vertex]bool, error) {
 	return copyMap(d.getAncestors(v)), nil
 }
 
-// GetOrderedAncestors returns all ancestors of a vertex in a breath-first
+// GetOrderedAncestors returns all ancestors of the vertex v in a breath-first
 // order. Only the first occurrence of each vertex is returned.
 // GetOrderedAncestors returns an error, if v is nil or unknown.
 //
@@ -530,9 +530,9 @@ func (d *DAG) walkAncestors(v Vertex, vertices chan Vertex, signal chan bool) {
 }
 
 // AncestorsWalker returns a channel and subsequently returns / walks all
-// ancestors of a vertex in a breath first order. The second channel returned
-// may be used to stop further walking.
-// AncestorsWalker returns an error, if v is nil or unknown.
+// ancestors of the vertex v in a breath first order. The second channel
+// returned may be used to stop further walking. AncestorsWalker returns an
+// error, if v is nil or unknown.
 //
 // Note, there is no order between sibling vertices. Two consecutive runs of
 // AncestorsWalker may return different results.
@@ -559,8 +559,8 @@ func (d *DAG) AncestorsWalker(v Vertex) (chan Vertex, chan bool, error) {
 	return vertices, signal, nil
 }
 
-// GetOrderedDescendants returns all descendants of a vertex in a breath-first
-// order. Only the first occurrence of each vertex is returned.
+// GetOrderedDescendants returns all descendants of the vertex v in a breath-
+// first order. Only the first occurrence of each vertex is returned.
 // GetOrderedDescendants returns an error, if v is nil or unknown.
 //
 // Note, there is no order between sibling vertices. Two consecutive runs of
@@ -638,7 +638,6 @@ func (d *DAG) getDescendants(v Vertex) map[Vertex]bool {
 	return cache
 }
 
-// Return all Descendants of the given vertex.
 // GetDescendants return all ancestors of the vertex v. GetDescendants returns
 // an error, if v is nil or unknown.
 //
@@ -691,9 +690,9 @@ func (d *DAG) walkDescendants(v Vertex, vertices chan Vertex, signal chan bool) 
 }
 
 // DescendantsWalker returns a channel and subsequently returns / walks all
-// descendants of a vertex in a breath first order. The second channel returned
-// may be used to stop further walking.
-// DescendantsWalker returns an error, if v is nil or unknown.
+// descendants of the vertex v in a breath first order. The second channel
+// returned may be used to stop further walking. DescendantsWalker returns an
+// error, if v is nil or unknown.
 //
 // Note, there is no order between sibling vertices. Two consecutive runs of
 // DescendantsWalker may return different results.
