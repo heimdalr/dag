@@ -365,6 +365,17 @@ func (d *DAG) GetVertices() map[Vertex]bool {
 	return copyMap(d.vertices)
 }
 
+// GetParents returns all parents of vertex v. GetParents returns an error,
+// if v is nil or unknown.
+func (d *DAG) GetParents(v Vertex) (map[Vertex]bool, error) {
+	if err := d.saneVertex(v); err != nil {
+		return nil, err
+	}
+	d.muDAG.RLock()
+	defer d.muDAG.RUnlock()
+	return copyMap(d.inboundEdge[v]), nil
+}
+
 // GetChildren returns all children of vertex v. GetChildren returns an error,
 // if v is nil or unknown.
 func (d *DAG) GetChildren(v Vertex) (map[Vertex]bool, error) {
@@ -377,15 +388,18 @@ func (d *DAG) GetChildren(v Vertex) (map[Vertex]bool, error) {
 	return copyMap(d.outboundEdge[v]), nil
 }
 
-// GetParents returns all parents of vertex v. GetParents returns an error,
-// if v is nil or unknown.
-func (d *DAG) GetParents(v Vertex) (map[Vertex]bool, error) {
+// GetAncestors return all ancestors of the vertex v. GetAncestors returns an
+// error, if v is nil or unknown.
+//
+// Note, in order to get the ancestors, GetAncestors populates the ancestor-
+// cache as needed. Depending on order and size of the sub-graph of v this may
+// take a long time and consume a lot of memory.
+func (d *DAG) GetAncestors(v Vertex) (map[Vertex]bool, error) {
+
 	if err := d.saneVertex(v); err != nil {
 		return nil, err
 	}
-	d.muDAG.RLock()
-	defer d.muDAG.RUnlock()
-	return copyMap(d.inboundEdge[v]), nil
+	return copyMap(d.getAncestors(v)), nil
 }
 
 func (d *DAG) getAncestors(v Vertex) map[Vertex]bool {
@@ -436,20 +450,6 @@ func (d *DAG) getAncestors(v Vertex) map[Vertex]bool {
 	return cache
 }
 
-// GetAncestors return all ancestors of the vertex v. GetAncestors returns an
-// error, if v is nil or unknown.
-//
-// Note, in order to get the ancestors, GetAncestors populates the ancestor-
-// cache as needed. Depending on order and size of the sub-graph of v this may
-// take a long time and consume a lot of memory.
-func (d *DAG) GetAncestors(v Vertex) (map[Vertex]bool, error) {
-
-	if err := d.saneVertex(v); err != nil {
-		return nil, err
-	}
-	return copyMap(d.getAncestors(v)), nil
-}
-
 // GetOrderedAncestors returns all ancestors of the vertex v in a breath-first
 // order. Only the first occurrence of each vertex is returned.
 // GetOrderedAncestors returns an error, if v is nil or unknown.
@@ -467,6 +467,29 @@ func (d *DAG) GetOrderedAncestors(v Vertex) ([]Vertex, error) {
 		ancestors = append(ancestors, v)
 	}
 	return ancestors, nil
+}
+
+// AncestorsWalker returns a channel and subsequently returns / walks all
+// ancestors of the vertex v in a breath first order. The second channel
+// returned may be used to stop further walking. AncestorsWalker returns an
+// error, if v is nil or unknown.
+//
+// Note, there is no order between sibling vertices. Two consecutive runs of
+// AncestorsWalker may return different results.
+func (d *DAG) AncestorsWalker(v Vertex) (chan Vertex, chan bool, error) {
+	if err := d.saneVertex(v); err != nil {
+		return nil, nil, err
+	}
+	vertices := make(chan Vertex)
+	signal := make(chan bool, 1)
+	go func() {
+		d.muDAG.RLock()
+		d.walkAncestors(v, vertices, signal)
+		d.muDAG.RUnlock()
+		close(vertices)
+		close(signal)
+	}()
+	return vertices, signal, nil
 }
 
 func (d *DAG) walkAncestors(v Vertex, vertices chan Vertex, signal chan bool) {
@@ -498,46 +521,18 @@ func (d *DAG) walkAncestors(v Vertex, vertices chan Vertex, signal chan bool) {
 	}
 }
 
-// AncestorsWalker returns a channel and subsequently returns / walks all
-// ancestors of the vertex v in a breath first order. The second channel
-// returned may be used to stop further walking. AncestorsWalker returns an
-// error, if v is nil or unknown.
+// GetDescendants return all ancestors of the vertex v. GetDescendants returns
+// an error, if v is nil or unknown.
 //
-// Note, there is no order between sibling vertices. Two consecutive runs of
-// AncestorsWalker may return different results.
-func (d *DAG) AncestorsWalker(v Vertex) (chan Vertex, chan bool, error) {
+// Note, in order to get the ancestors, GetDescendants populates the
+// descendants-cache as needed. Depending on order and size of the sub-graph of
+// v this may take a long time and consume a lot of memory.
+func (d *DAG) GetDescendants(v Vertex) (map[Vertex]bool, error) {
+
 	if err := d.saneVertex(v); err != nil {
-		return nil, nil, err
-	}
-	vertices := make(chan Vertex)
-	signal := make(chan bool, 1)
-	go func() {
-		d.muDAG.RLock()
-		d.walkAncestors(v, vertices, signal)
-		d.muDAG.RUnlock()
-		close(vertices)
-		close(signal)
-	}()
-	return vertices, signal, nil
-}
-
-// GetOrderedDescendants returns all descendants of the vertex v in a breath-
-// first order. Only the first occurrence of each vertex is returned.
-// GetOrderedDescendants returns an error, if v is nil or unknown.
-//
-// Note, there is no order between sibling vertices. Two consecutive runs of
-// GetOrderedDescendants may return different results.
-func (d *DAG) GetOrderedDescendants(v Vertex) ([]Vertex, error) {
-
-	vertices, _, err := d.DescendantsWalker(v)
-	if err != nil {
 		return nil, err
 	}
-	var descendants []Vertex
-	for v := range vertices {
-		descendants = append(descendants, v)
-	}
-	return descendants, nil
+	return copyMap(d.getDescendants(v)), nil
 }
 
 func (d *DAG) getDescendants(v Vertex) map[Vertex]bool {
@@ -594,18 +589,46 @@ func (d *DAG) getDescendants(v Vertex) map[Vertex]bool {
 	return cache
 }
 
-// GetDescendants return all ancestors of the vertex v. GetDescendants returns
-// an error, if v is nil or unknown.
+// GetOrderedDescendants returns all descendants of the vertex v in a breath-
+// first order. Only the first occurrence of each vertex is returned.
+// GetOrderedDescendants returns an error, if v is nil or unknown.
 //
-// Note, in order to get the ancestors, GetDescendants populates the
-// descendants-cache as needed. Depending on order and size of the sub-graph of
-// v this may take a long time and consume a lot of memory.
-func (d *DAG) GetDescendants(v Vertex) (map[Vertex]bool, error) {
+// Note, there is no order between sibling vertices. Two consecutive runs of
+// GetOrderedDescendants may return different results.
+func (d *DAG) GetOrderedDescendants(v Vertex) ([]Vertex, error) {
 
-	if err := d.saneVertex(v); err != nil {
+	vertices, _, err := d.DescendantsWalker(v)
+	if err != nil {
 		return nil, err
 	}
-	return copyMap(d.getDescendants(v)), nil
+	var descendants []Vertex
+	for v := range vertices {
+		descendants = append(descendants, v)
+	}
+	return descendants, nil
+}
+
+// DescendantsWalker returns a channel and subsequently returns / walks all
+// descendants of the vertex v in a breath first order. The second channel
+// returned may be used to stop further walking. DescendantsWalker returns an
+// error, if v is nil or unknown.
+//
+// Note, there is no order between sibling vertices. Two consecutive runs of
+// DescendantsWalker may return different results.
+func (d *DAG) DescendantsWalker(v Vertex) (chan Vertex, chan bool, error) {
+	if err := d.saneVertex(v); err != nil {
+		return nil, nil, err
+	}
+	vertices := make(chan Vertex)
+	signal := make(chan bool, 1)
+	go func() {
+		d.muDAG.RLock()
+		d.walkDescendants(v, vertices, signal)
+		d.muDAG.RUnlock()
+		close(vertices)
+		close(signal)
+	}()
+	return vertices, signal, nil
 }
 
 func (d *DAG) walkDescendants(v Vertex, vertices chan Vertex, signal chan bool) {
@@ -635,29 +658,6 @@ func (d *DAG) walkDescendants(v Vertex, vertices chan Vertex, signal chan bool) 
 			vertices <- top
 		}
 	}
-}
-
-// DescendantsWalker returns a channel and subsequently returns / walks all
-// descendants of the vertex v in a breath first order. The second channel
-// returned may be used to stop further walking. DescendantsWalker returns an
-// error, if v is nil or unknown.
-//
-// Note, there is no order between sibling vertices. Two consecutive runs of
-// DescendantsWalker may return different results.
-func (d *DAG) DescendantsWalker(v Vertex) (chan Vertex, chan bool, error) {
-	if err := d.saneVertex(v); err != nil {
-		return nil, nil, err
-	}
-	vertices := make(chan Vertex)
-	signal := make(chan bool, 1)
-	go func() {
-		d.muDAG.RLock()
-		d.walkDescendants(v, vertices, signal)
-		d.muDAG.RUnlock()
-		close(vertices)
-		close(signal)
-	}()
-	return vertices, signal, nil
 }
 
 // String return a textual representation of the graph.
