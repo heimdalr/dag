@@ -863,7 +863,7 @@ func (d *dMutex) unlock(i interface{}) {
 	// unlock instance mutex
 	d.mutexes[i].mutex.Unlock()
 
-	// descrease the count, as we are no longer interested in this instance
+	// decrease the count, as we are no longer interested in this instance
 	// mutex
 	d.mutexes[i].count--
 
