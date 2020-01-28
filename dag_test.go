@@ -244,10 +244,10 @@ func TestDAG_AddEdge(t *testing.T) {
 	// loop
 	errLoopSrcSrc := dag.AddEdge(v1, v1)
 	if errLoopSrcSrc == nil {
-		t.Errorf("AddEdge(v1, v1) = nil, want %T", EdgeLoopError{v1, v1})
+		t.Errorf("AddEdge(v1, v1) = nil, want %T", SrcDstEqualError{v1, v1})
 	}
-	if _, ok := errLoopSrcSrc.(EdgeLoopError); !ok {
-		t.Errorf("AddEdge(v1, v1) expected EdgeLoopError, got %T", errLoopSrcSrc)
+	if _, ok := errLoopSrcSrc.(SrcDstEqualError); !ok {
+		t.Errorf("AddEdge(v1, v1) expected SrcDstEqualError, got %T", errLoopSrcSrc)
 	}
 	errLoopDstSrc := dag.AddEdge(v2, v1)
 	if errLoopDstSrc == nil {

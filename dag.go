@@ -1,4 +1,4 @@
-// Package dag implements a Directed Acyclic Graph data structure and relevant methods.
+// Package dag implements directed acyclic graphs (DAGs).
 package dag
 
 import (
@@ -6,13 +6,17 @@ import (
 	"sync"
 )
 
-// Interface for the nodes in the DAG.
+// Vertex is the interface to be implemented for the vertices of the DAG.
 type Vertex interface {
+
+	// Return a string representation of the vertex.
 	String() string
+
+	// Return the id of this vertex. This id must be unique and never change.
 	Id() string
 }
 
-// The DAG type implements a Directed Acyclic Graph.
+// DAG implements the data structure of the DAG.
 type DAG struct {
 	muDAG            sync.RWMutex
 	vertices         map[Vertex]bool
@@ -25,7 +29,7 @@ type DAG struct {
 	descendantsCache map[Vertex]map[Vertex]bool
 }
 
-// Creates / initializes a new Directed Acyclic Graph or DAG.
+// NewDAG creates / initializes a new DAG.
 func NewDAG() *DAG {
 	return &DAG{
 		vertices:         make(map[Vertex]bool),
@@ -38,15 +42,16 @@ func NewDAG() *DAG {
 	}
 }
 
-// Add a vertex.
-// For vertices that are part of an edge use AddEdge() instead.
+// AddVertex adds the vertex v to the DAG. AddVertex returns an error, if v is
+// nil, v is already part of the graph, or the id of v is already part of the
+// graph.
 func (d *DAG) AddVertex(v Vertex) error {
 
 	// sanity checking
 	if v == nil {
 		return VertexNilError{}
 	}
-	id := v.String()
+	id := v.Id()
 	d.muDAG.RLock()
 	_, VertexExists := d.vertices[v]
 	_, IdExists := d.vertexIds[id]
@@ -65,7 +70,8 @@ func (d *DAG) AddVertex(v Vertex) error {
 	return nil
 }
 
-// Get a vertex by its id.
+// GetVertex returns a vertex by its id. GetVertex returns an error, if id is
+// the empty string or unknown.
 func (d *DAG) GetVertex(id string) (Vertex, error) {
 
 	// sanity checking
@@ -82,8 +88,9 @@ func (d *DAG) GetVertex(id string) (Vertex, error) {
 	return v, nil
 }
 
-// Delete a vertex including all inbound and outbound edges. Delete cached ancestors and descendants of relevant
-// vertices.
+// DeleteVertex deletes the vertex v. DeleteVertex also deletes all attached
+// edges (inbound and outbound) as well as ancestor- and descendant-caches of
+// related vertices. DeleteVertex returns an error, if v is nil or unknown.
 func (d *DAG) DeleteVertex(v Vertex) error {
 
 	// sanity checking
@@ -146,23 +153,33 @@ func (d *DAG) DeleteVertex(v Vertex) error {
 	return nil
 }
 
-// Add an edge while preventing circles.
+// AddEdge adds an edge between src and dst. AddEdge returns an error, if src
+// or dst are nil or if the edge would create a loop. AddEdge calls AddVertex,
+// if src and/or dst are not yet known within the DAG.
 func (d *DAG) AddEdge(src Vertex, dst Vertex) error {
 
 	// sanity checking
-	if src == nil {
+	if src == nil || dst == nil {
 		return VertexNilError{}
 	}
-	if dst == nil {
-		return VertexNilError{}
+
+	// check for equality
+	if src == dst {
+		return SrcDstEqualError{src, dst}
 	}
 
 	// ensure vertices
 	if !d.vertices[src] {
-		d.AddVertex(src)
+		err := d.AddVertex(src)
+		if err != nil {
+			return err
+		}
 	}
 	if !d.vertices[dst] {
-		d.AddVertex(dst)
+		err := d.AddVertex(dst)
+		if err != nil {
+			return err
+		}
 	}
 
 	// test / compute edge nodes and the edge itself
@@ -225,15 +242,19 @@ func (d *DAG) AddEdge(src Vertex, dst Vertex) error {
 	return nil
 }
 
-// Delete an edge.
+// DeleteEdge deletes an edge. DeleteEdge also deletes ancestor- and
+// descendant-caches of related vertices. DeleteEdge returns an error, if src
+// or dst are nil or unknown, or if there is no edge between src and dst.
 func (d *DAG) DeleteEdge(src Vertex, dst Vertex) error {
 
 	// sanity checking
-	if src == nil {
+	if src == nil || dst == nil {
 		return VertexNilError{}
 	}
-	if dst == nil {
-		return VertexNilError{}
+
+	// check for equality
+	if src == dst {
+		return SrcDstEqualError{src, dst}
 	}
 
 	d.muDAG.RLock()
@@ -290,14 +311,14 @@ func (d *DAG) DeleteEdge(src Vertex, dst Vertex) error {
 	return nil
 }
 
-// Return the total number of vertices.
+// GetOrder returns the number of vertices in the graph.
 func (d *DAG) GetOrder() int {
 	d.muDAG.RLock()
 	defer d.muDAG.RUnlock()
 	return len(d.vertices)
 }
 
-// Return the total number of edges.
+// GetSize returns the number of edges in the graph.
 func (d *DAG) GetSize() int {
 	count := 0
 	d.muDAG.RLock()
@@ -308,7 +329,7 @@ func (d *DAG) GetSize() int {
 	return count
 }
 
-// Return all vertices without children.
+// GetLeafs returns all vertices without children.
 func (d *DAG) GetLeafs() map[Vertex]bool {
 	leafs := make(map[Vertex]bool)
 	d.muDAG.RLock()
@@ -322,7 +343,7 @@ func (d *DAG) GetLeafs() map[Vertex]bool {
 	return leafs
 }
 
-// Return all vertices without parents.
+// GetRoots returns all vertices without parents.
 func (d *DAG) GetRoots() map[Vertex]bool {
 	roots := make(map[Vertex]bool)
 	d.muDAG.RLock()
@@ -344,14 +365,15 @@ func copyMap(in map[Vertex]bool) map[Vertex]bool {
 	return out
 }
 
-// Return all vertices.
+// GetVertices returns all vertices.
 func (d *DAG) GetVertices() map[Vertex]bool {
 	d.muDAG.RLock()
 	defer d.muDAG.RUnlock()
 	return copyMap(d.vertices)
 }
 
-// Return all children of the given vertex.
+// GetChildren returns all children of vertex v. GetChildren returns an error,
+// if v is nil or unknown.
 func (d *DAG) GetChildren(v Vertex) (map[Vertex]bool, error) {
 
 	// sanity checking
@@ -367,7 +389,8 @@ func (d *DAG) GetChildren(v Vertex) (map[Vertex]bool, error) {
 	return copyMap(d.outboundEdge[v]), nil
 }
 
-// Return all parents of the given vertex.
+// GetParents returns all parents of vertex v. GetParents returns an error,
+// if v is nil or unknown.
 func (d *DAG) GetParents(v Vertex) (map[Vertex]bool, error) {
 	// sanity checking
 	if v == nil {
@@ -382,7 +405,7 @@ func (d *DAG) GetParents(v Vertex) (map[Vertex]bool, error) {
 	return copyMap(d.inboundEdge[v]), nil
 }
 
-func (d *DAG) getAncestorsAux(v Vertex) map[Vertex]bool {
+func (d *DAG) getAncestors(v Vertex) map[Vertex]bool {
 
 	// in the best case we have already a populated cache
 	d.muCache.RLock()
@@ -396,7 +419,8 @@ func (d *DAG) getAncestorsAux(v Vertex) map[Vertex]bool {
 	d.verticesLocked.lock(v)
 	defer d.verticesLocked.unlock(v)
 
-	// now as we have locked this vertex, check (again) that no one has meanwhile populated the cache
+	// now as we have locked this vertex, check (again) that no one has
+	// meanwhile populated the cache
 	d.muCache.RLock()
 	cache, exists = d.ancestorsCache[v]
 	d.muCache.RUnlock()
@@ -404,14 +428,15 @@ func (d *DAG) getAncestorsAux(v Vertex) map[Vertex]bool {
 		return cache
 	}
 
-	// as there is no cache, we start from scratch and first of all collect all ancestors locally
+	// as there is no cache, we start from scratch and first of all collect
+	// all ancestors locally
 	cache = make(map[Vertex]bool)
 	var mu sync.Mutex
 	if parents, ok := d.inboundEdge[v]; ok {
 
 		// for each parent collect its ancestors
 		for parent := range parents {
-			parentAncestors := d.getAncestorsAux(parent)
+			parentAncestors := d.getAncestors(parent)
 			mu.Lock()
 			for ancestor := range parentAncestors {
 				cache[ancestor] = true
@@ -428,7 +453,12 @@ func (d *DAG) getAncestorsAux(v Vertex) map[Vertex]bool {
 	return cache
 }
 
-// Return all Ancestors of the given vertex.
+// GetAncestors return all ancestors of the vertex v. GetAncestors returns an
+// error, if v is nil or unknown.
+//
+// Note, in order to get the ancestors, GetAncestors populates the ancestor-
+// cache as needed. Depending on order and size of the sub-graph of v this may
+// take a long time and consume a lot of memory.
 func (d *DAG) GetAncestors(v Vertex) (map[Vertex]bool, error) {
 
 	// sanity checking
@@ -442,10 +472,15 @@ func (d *DAG) GetAncestors(v Vertex) (map[Vertex]bool, error) {
 		return nil, VertexUnknownError{v}
 	}
 
-	return copyMap(d.getAncestorsAux(v)), nil
+	return copyMap(d.getAncestors(v)), nil
 }
 
-// GetOrderedAncestors returns all ancestors of a vertex in a breath first order
+// GetOrderedAncestors returns all ancestors of a vertex in a breath-first
+// order. Only the first occurrence of each vertex is returned.
+// GetOrderedAncestors returns an error, if v is nil or unknown.
+//
+// Note, there is no order between sibling vertices. Two consecutive runs of
+// GetOrderedAncestors may return different results.
 func (d *DAG) GetOrderedAncestors(v Vertex) ([]Vertex, error) {
 
 	// sanity checking
@@ -465,7 +500,7 @@ func (d *DAG) GetOrderedAncestors(v Vertex) ([]Vertex, error) {
 	return ancestors, nil
 }
 
-func (d *DAG) walkAncestors(v Vertex, vertices chan Vertex, signal chan bool) error {
+func (d *DAG) walkAncestors(v Vertex, vertices chan Vertex, signal chan bool) {
 
 	var fifo []Vertex
 	visited := make(map[Vertex]bool)
@@ -475,7 +510,7 @@ func (d *DAG) walkAncestors(v Vertex, vertices chan Vertex, signal chan bool) er
 	}
 	for {
 		if len(fifo) == 0 {
-			return nil
+			return
 		}
 		top := fifo[0]
 		fifo = fifo[1:]
@@ -487,7 +522,7 @@ func (d *DAG) walkAncestors(v Vertex, vertices chan Vertex, signal chan bool) er
 		}
 		select {
 		case <-signal:
-			return nil
+			return
 		default:
 			vertices <- top
 		}
@@ -495,8 +530,12 @@ func (d *DAG) walkAncestors(v Vertex, vertices chan Vertex, signal chan bool) er
 }
 
 // AncestorsWalker returns a channel and subsequently returns / walks all
-// ancestors of a vertex in a breath first order.
-// The second channel returned may be used to stop further walking.
+// ancestors of a vertex in a breath first order. The second channel returned
+// may be used to stop further walking.
+// AncestorsWalker returns an error, if v is nil or unknown.
+//
+// Note, there is no order between sibling vertices. Two consecutive runs of
+// AncestorsWalker may return different results.
 func (d *DAG) AncestorsWalker(v Vertex) (chan Vertex, chan bool, error) {
 	// sanity checking
 	if v == nil {
@@ -520,7 +559,12 @@ func (d *DAG) AncestorsWalker(v Vertex) (chan Vertex, chan bool, error) {
 	return vertices, signal, nil
 }
 
-// GetOrderedDescendants returns all descendants of a vertex in a breath first order
+// GetOrderedDescendants returns all descendants of a vertex in a breath-first
+// order. Only the first occurrence of each vertex is returned.
+// GetOrderedDescendants returns an error, if v is nil or unknown.
+//
+// Note, there is no order between sibling vertices. Two consecutive runs of
+// GetOrderedDescendants may return different results.
 func (d *DAG) GetOrderedDescendants(v Vertex) ([]Vertex, error) {
 
 	// sanity checking
@@ -540,7 +584,7 @@ func (d *DAG) GetOrderedDescendants(v Vertex) ([]Vertex, error) {
 	return descendants, nil
 }
 
-func (d *DAG) getDescendantsAux(v Vertex) map[Vertex]bool {
+func (d *DAG) getDescendants(v Vertex) map[Vertex]bool {
 
 	// in the best case we have already a populated cache
 	d.muCache.RLock()
@@ -554,7 +598,8 @@ func (d *DAG) getDescendantsAux(v Vertex) map[Vertex]bool {
 	d.verticesLocked.lock(v)
 	defer d.verticesLocked.unlock(v)
 
-	// now as we have locked this vertex, check (again) that no one has meanwhile populated the cache
+	// now as we have locked this vertex, check (again) that no one has
+	// meanwhile populated the cache
 	d.muCache.RLock()
 	cache, exists = d.descendantsCache[v]
 	d.muCache.RUnlock()
@@ -562,7 +607,8 @@ func (d *DAG) getDescendantsAux(v Vertex) map[Vertex]bool {
 		return cache
 	}
 
-	// as there is no cache, we start from scratch and first of all collect all descendants locally
+	// as there is no cache, we start from scratch and first of all collect
+	// all descendants locally
 	cache = make(map[Vertex]bool)
 	var mu sync.Mutex
 	if children, ok := d.outboundEdge[v]; ok {
@@ -572,7 +618,7 @@ func (d *DAG) getDescendantsAux(v Vertex) map[Vertex]bool {
 		//waitGroup.Add(len(children))
 		for child := range children {
 			//go func(child Vertex, mu *sync.Mutex, cache map[Vertex]bool) {
-			childDescendants := d.getDescendantsAux(child)
+			childDescendants := d.getDescendants(child)
 			mu.Lock()
 			for descendant := range childDescendants {
 				cache[descendant] = true
@@ -593,6 +639,12 @@ func (d *DAG) getDescendantsAux(v Vertex) map[Vertex]bool {
 }
 
 // Return all Descendants of the given vertex.
+// GetDescendants return all ancestors of the vertex v. GetDescendants returns
+// an error, if v is nil or unknown.
+//
+// Note, in order to get the ancestors, GetDescendants populates the
+// descendants-cache as needed. Depending on order and size of the sub-graph of
+// v this may take a long time and consume a lot of memory.
 func (d *DAG) GetDescendants(v Vertex) (map[Vertex]bool, error) {
 
 	// sanity checking
@@ -606,10 +658,10 @@ func (d *DAG) GetDescendants(v Vertex) (map[Vertex]bool, error) {
 		return nil, VertexUnknownError{v}
 	}
 
-	return copyMap(d.getDescendantsAux(v)), nil
+	return copyMap(d.getDescendants(v)), nil
 }
 
-func (d *DAG) walkDescendants(v Vertex, vertices chan Vertex, signal chan bool) error {
+func (d *DAG) walkDescendants(v Vertex, vertices chan Vertex, signal chan bool) {
 
 	var fifo []Vertex
 	visited := make(map[Vertex]bool)
@@ -619,7 +671,7 @@ func (d *DAG) walkDescendants(v Vertex, vertices chan Vertex, signal chan bool) 
 	}
 	for {
 		if len(fifo) == 0 {
-			return nil
+			return
 		}
 		top := fifo[0]
 		fifo = fifo[1:]
@@ -631,7 +683,7 @@ func (d *DAG) walkDescendants(v Vertex, vertices chan Vertex, signal chan bool) 
 		}
 		select {
 		case <-signal:
-			return nil
+			return
 		default:
 			vertices <- top
 		}
@@ -639,8 +691,12 @@ func (d *DAG) walkDescendants(v Vertex, vertices chan Vertex, signal chan bool) 
 }
 
 // DescendantsWalker returns a channel and subsequently returns / walks all
-// descendants of a vertex in a breath first order.
-// The second channel returned may be used to stop further walking.
+// descendants of a vertex in a breath first order. The second channel returned
+// may be used to stop further walking.
+// DescendantsWalker returns an error, if v is nil or unknown.
+//
+// Note, there is no order between sibling vertices. Two consecutive runs of
+// DescendantsWalker may return different results.
 func (d *DAG) DescendantsWalker(v Vertex) (chan Vertex, chan bool, error) {
 	// sanity checking
 	if v == nil {
@@ -664,7 +720,7 @@ func (d *DAG) DescendantsWalker(v Vertex) (chan Vertex, chan bool, error) {
 	return vertices, signal, nil
 }
 
-// Return a representation of the graph.
+// String return a textual representation of the graph.
 func (d *DAG) String() string {
 	result := fmt.Sprintf("DAG Vertices: %d - Edges: %d\n", d.GetOrder(), d.GetSize())
 	result += fmt.Sprintf("Vertices:\n")
@@ -686,7 +742,8 @@ func (d *DAG) String() string {
 ********** Errors **********
 ****************************/
 
-// Error type to describe the situation, that a nil is given instead of a vertex.
+// VertexNilError is the error type to describe the situation, that a nil is
+// given instead of a vertex.
 type VertexNilError struct{}
 
 // Implements the error interface.
@@ -694,7 +751,8 @@ func (e VertexNilError) Error() string {
 	return fmt.Sprint("don't know what to do with 'nil'")
 }
 
-// Error type to describe the situation, that a nil is given instead of a vertex.
+// IdEmptyError is the error type to describe the situation, that a nil is
+// given instead of a vertex.
 type IdEmptyError struct{}
 
 // Implements the error interface.
@@ -702,7 +760,8 @@ func (e IdEmptyError) Error() string {
 	return fmt.Sprint("don't know what to do with 'nil'")
 }
 
-// Error type to describe the situation, that a given vertex already exists in the graph.
+// VertexDuplicateError is the error type to describe the situation, that a
+// given vertex already exists in the graph.
 type VertexDuplicateError struct {
 	v Vertex
 }
@@ -712,7 +771,8 @@ func (e VertexDuplicateError) Error() string {
 	return fmt.Sprintf("'%s' is already known", e.v.String())
 }
 
-// Error type to describe the situation, that a given vertex id already exists in the graph.
+// IdDuplicateError is the error type to describe the situation, that a given
+// vertex id already exists in the graph.
 type IdDuplicateError struct {
 	v Vertex
 }
@@ -722,7 +782,8 @@ func (e IdDuplicateError) Error() string {
 	return fmt.Sprintf("the id '%s' is already known", e.v.Id())
 }
 
-// Error type to describe the situation, that a given vertex does not exit in the graph.
+// VertexUnknownError is the error type to describe the situation, that a given
+// vertex does not exit in the graph.
 type VertexUnknownError struct {
 	v Vertex
 }
@@ -732,7 +793,8 @@ func (e VertexUnknownError) Error() string {
 	return fmt.Sprintf("'%s' is unknown", e.v.String())
 }
 
-// Error type to describe the situation, that a given vertex does not exit in the graph.
+// IdUnknownError is the error type to describe the situation, that a given
+// vertex does not exit in the graph.
 type IdUnknownError struct {
 	id string
 }
@@ -742,7 +804,8 @@ func (e IdUnknownError) Error() string {
 	return fmt.Sprintf("'%s' is unknown", e.id)
 }
 
-// Error type to describe the situation, that an edge already exists in the graph.
+// EdgeDuplicateError is the error type to describe the situation, that an edge
+// already exists in the graph.
 type EdgeDuplicateError struct {
 	src Vertex
 	dst Vertex
@@ -753,7 +816,8 @@ func (e EdgeDuplicateError) Error() string {
 	return fmt.Sprintf("edge between '%s' and '%s' is already known", e.src.String(), e.dst.String())
 }
 
-// Error type to describe the situation, that a given edge does not exit in the graph.
+// EdgeUnknownError is the error type to describe the situation, that a given
+// edge does not exit in the graph.
 type EdgeUnknownError struct {
 	src Vertex
 	dst Vertex
@@ -764,7 +828,8 @@ func (e EdgeUnknownError) Error() string {
 	return fmt.Sprintf("edge between '%s' and '%s' is unknown", e.src.String(), e.dst.String())
 }
 
-// Error type to describe loop errors (i.e. errors that where raised to prevent establishing loops in the graph).
+// EdgeLoopError is the error type to describe loop errors (i.e. errors that
+// where raised to prevent establishing loops in the graph).
 type EdgeLoopError struct {
 	src Vertex
 	dst Vertex
@@ -773,6 +838,18 @@ type EdgeLoopError struct {
 // Implements the error interface.
 func (e EdgeLoopError) Error() string {
 	return fmt.Sprintf("edge between '%s' and '%s' would create a loop", e.src.String(), e.dst.String())
+}
+
+// SrcDstEqualError is the error type to describe the situation, that src and
+// dst are equal.
+type SrcDstEqualError struct {
+	src Vertex
+	dst Vertex
+}
+
+// Implements the error interface.
+func (e SrcDstEqualError) Error() string {
+	return fmt.Sprintf("src ('%s') and dst ('%s') equal", e.src.String(), e.dst.String())
 }
 
 /***************************
