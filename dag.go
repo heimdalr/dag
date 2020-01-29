@@ -673,6 +673,8 @@ func (d *DAG) ReduceTransitively() {
 
 	d.muDAG.Lock()
 
+	graphChanged := false
+
 	// populate the descendents cache for all roots (i.e. the whole graph)
 	for root := range d.getRoots() {
 		_ = d.getDescendants(root)
@@ -701,8 +703,15 @@ func (d *DAG) ReduceTransitively() {
 			if descendentsOfChildrenOfV[childOfV] {
 				delete(d.outboundEdge[v], childOfV)
 				delete(d.inboundEdge[childOfV], v)
+				graphChanged = true
 			}
 		}
+	}
+
+	// flush the descendants- and ancestor cache if the graph has changed
+	if graphChanged {
+		d.ancestorsCache = make(map[Vertex]map[Vertex]bool)
+		d.descendantsCache = make(map[Vertex]map[Vertex]bool)
 	}
 
 	d.muDAG.Unlock()
