@@ -6,7 +6,7 @@
 [![Go Report Card](https://goreportcard.com/badge/github.com/heimdalr/dag)](https://goreportcard.com/report/github.com/heimdalr/dag)
 [![Nutrition Facts](http://code.grevit.net/badge/O%2B%2B_S%2B%2B_I%2B_C%2B_E%2B%2B%2B_M_V%2B_PS%2B%2B_!D)](http://code.grevit.net/facts/O%2B%2B_S%2B%2B_I%2B_C%2B_E%2B%2B%2B_M_V%2B_PS%2B%2B_!D)
 
-Yet another directed acyclic graph (DAG) implementation in golang.
+Fast and thread-safe directed acyclic graph (DAG) implementation in pure golang.
 
 ## Quickstart
 
