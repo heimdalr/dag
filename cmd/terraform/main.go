@@ -1,6 +1,7 @@
 package main
 
-/*import (
+/*
+import (
 	"fmt"
 	"github.com/hashicorp/terraform/dag"
 	"math"
@@ -20,48 +21,51 @@ func (v largeVertex) String() string {
 func (v largeVertex) Id() string {
 	return fmt.Sprintf("%d", v.value)
 }
+*/
 
 func main() {
-	var d dag.AcyclicGraph
+	/*
+		var d dag.AcyclicGraph
 
-	root := d.Add(1)
-	levels := 7
-	branches := 9
-	var start, end time.Time
+		root := d.Add(1)
+		levels := 7
+		branches := 9
+		var start, end time.Time
 
-	start = time.Now()
-	largeAux(d, levels, branches, root)
-	_ = d.Validate()
-	end = time.Now()
-	fmt.Printf("%fs to add %d vertices and %d edges\n", end.Sub(start).Seconds(), len(d.Vertices()), len(d.Edges()))
-	expectedVertexCount := sum(0, levels-1, branches, pow)
-	vertexCount := len(d.Vertices())
-	if vertexCount != expectedVertexCount {
-		panic(fmt.Sprintf("GetVertices() = %d, want %d", vertexCount, expectedVertexCount))
-	}
+		start = time.Now()
+		largeAux(d, levels, branches, root)
+		_ = d.Validate()
+		end = time.Now()
+		fmt.Printf("%fs to add %d vertices and %d edges\n", end.Sub(start).Seconds(), len(d.Vertices()), len(d.Edges()))
+		expectedVertexCount := sum(0, levels-1, branches, pow)
+		vertexCount := len(d.Vertices())
+		if vertexCount != expectedVertexCount {
+			panic(fmt.Sprintf("GetVertices() = %d, want %d", vertexCount, expectedVertexCount))
+		}
 
-	start = time.Now()
-	descendants, _ := d.Descendents(root)
-	end = time.Now()
-	fmt.Printf("%fs to get descendants\n", end.Sub(start).Seconds())
-	descendantsCount := descendants.Len()
-	expectedDescendantsCount := vertexCount - 1
-	if descendantsCount != expectedDescendantsCount {
-		panic(fmt.Sprintf("GetDescendants(root) = %d, want %d", descendantsCount, expectedDescendantsCount))
-	}
+		start = time.Now()
+		descendants, _ := d.Descendents(root)
+		end = time.Now()
+		fmt.Printf("%fs to get descendants\n", end.Sub(start).Seconds())
+		descendantsCount := descendants.Len()
+		expectedDescendantsCount := vertexCount - 1
+		if descendantsCount != expectedDescendantsCount {
+			panic(fmt.Sprintf("GetDescendants(root) = %d, want %d", descendantsCount, expectedDescendantsCount))
+		}
 
-	start = time.Now()
-	_, _ = d.Descendents(root)
-	end = time.Now()
-	fmt.Printf("%fs to get descendants 2nd time\n", end.Sub(start).Seconds())
+		start = time.Now()
+		_, _ = d.Descendents(root)
+		end = time.Now()
+		fmt.Printf("%fs to get descendants 2nd time\n", end.Sub(start).Seconds())
 
-	start = time.Now()
-	d.TransitiveReduction()
-	end = time.Now()
-	fmt.Printf("%fs to transitively reduce the graph\n", end.Sub(start).Seconds())
-
+		start = time.Now()
+		d.TransitiveReduction()
+		end = time.Now()
+		fmt.Printf("%fs to transitively reduce the graph\n", end.Sub(start).Seconds())
+	*/
 }
 
+/*
 func largeAux(d dag.AcyclicGraph, level int, branches int, parent dag.Vertex) {
 	if level > 1 {
 		if branches < 1 || branches > 9 {
