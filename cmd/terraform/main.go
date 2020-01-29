@@ -1,6 +1,6 @@
 package main
 
-import (
+/*import (
 	"fmt"
 	"github.com/hashicorp/terraform/dag"
 	"math"
@@ -92,4 +92,4 @@ func sum(x, y, branches int, fn interface{}) int {
 func pow(base int, exp int) int {
 	pow := math.Pow(float64(base), float64(exp))
 	return int(pow)
-}
+}*/
