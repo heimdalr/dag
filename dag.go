@@ -672,6 +672,7 @@ func (d *DAG) walkDescendants(v Vertex, vertices chan Vertex, signal chan bool) 
 func (d *DAG) ReduceTransitively() {
 
 	d.muDAG.Lock()
+	defer d.muDAG.Unlock()
 
 	graphChanged := false
 
@@ -710,11 +711,23 @@ func (d *DAG) ReduceTransitively() {
 
 	// flush the descendants- and ancestor cache if the graph has changed
 	if graphChanged {
-		d.ancestorsCache = make(map[Vertex]map[Vertex]bool)
-		d.descendantsCache = make(map[Vertex]map[Vertex]bool)
+		d.flushCaches()
 	}
+}
 
-	d.muDAG.Unlock()
+// FlushCaches completely flushes the descendants- and ancestor cache.
+//
+// Note, the only reason to call this method is to free up memory.
+// Otherwise the caches are automatically maintained.
+func (d *DAG) FlushCaches() {
+	d.muDAG.Lock()
+	defer d.muDAG.Unlock()
+	d.flushCaches()
+}
+
+func (d *DAG) flushCaches() {
+	d.ancestorsCache = make(map[Vertex]map[Vertex]bool)
+	d.descendantsCache = make(map[Vertex]map[Vertex]bool)
 }
 
 // String return a textual representation of the graph.

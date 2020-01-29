@@ -49,6 +49,11 @@ func main() {
 	}
 
 	start = time.Now()
+	_, _ = d.GetDescendants(root)
+	end = time.Now()
+	fmt.Printf("%fs to get descendants 2nd time\n", end.Sub(start).Seconds())
+
+	start = time.Now()
 	descendantsOrdered, _ := d.GetOrderedDescendants(root)
 	end = time.Now()
 	fmt.Printf("%fs to get descendants ordered\n", end.Sub(start).Seconds())
@@ -56,11 +61,6 @@ func main() {
 	if descendantsOrderedCount != expectedDescendantsCount {
 		panic(fmt.Sprintf("GetOrderedDescendants(root) = %d, want %d", descendantsOrderedCount, expectedDescendantsCount))
 	}
-
-	start = time.Now()
-	_, _ = d.GetDescendants(root)
-	end = time.Now()
-	fmt.Printf("%fs to get descendants 2nd time\n", end.Sub(start).Seconds())
 
 	start = time.Now()
 	children, _ := d.GetChildren(root)
@@ -71,6 +71,22 @@ func main() {
 	if childrenCount != expectedChildrenCount {
 		panic(fmt.Sprintf("GetChildren(root) = %d, want %d", childrenCount, expectedChildrenCount))
 	}
+
+	_, _ = d.GetDescendants(root)
+	edgeCountBefore := d.GetSize()
+	start = time.Now()
+	d.ReduceTransitively()
+	end = time.Now()
+	fmt.Printf("%fs to transitively reduce the graph with caches poupulated\n", end.Sub(start).Seconds())
+	if edgeCountBefore != d.GetSize() {
+		panic(fmt.Sprintf("GetSize() = %d, want %d", d.GetSize(), edgeCountBefore))
+	}
+
+	d.FlushCaches()
+	start = time.Now()
+	d.ReduceTransitively()
+	end = time.Now()
+	fmt.Printf("%fs to transitively reduce the graph without caches poupulated\n", end.Sub(start).Seconds())
 
 	var childList []dag.Vertex
 	for x := range children {
