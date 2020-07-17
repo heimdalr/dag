@@ -619,7 +619,7 @@ func TestDAG_AncestorsWalker(t *testing.T) {
 		t.Errorf("AncestorsWalker(v4) = %v, want %v", ancestors, []Vertex{v2, v1})
 	}
 
-	signal := make(chan bool)
+	signal := make(chan bool, 1)
 	vertices2, _ := dag.AncestorsWalker(v4, signal)
 	for vertex := range vertices2 {
 		fmt.Printf("%v", vertex)
@@ -628,6 +628,7 @@ func TestDAG_AncestorsWalker(t *testing.T) {
 			break
 		}
 	}
+	close(signal)
 
 	// nil
 	_, errNil := dag.AncestorsWalker(nil, nil)

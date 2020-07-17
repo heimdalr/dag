@@ -454,9 +454,12 @@ func (d *DAG) GetOrderedAncestors(v Vertex) ([]Vertex, error) {
 	return vertices[1:], nil
 }
 
-func (d *DAG) walkAncestorsAux(v Vertex, vertices chan Vertex, signal <-chan bool) error {
+func (d *DAG) walkAncestorsAux(v Vertex, vertices chan Vertex, signal chan bool) error {
 
-	fifo := []Vertex{v}
+	var fifo []Vertex
+	for parent := range d.inboundEdge[v] {
+		fifo = append(fifo, parent)
+	}
 	for {
 		if len(fifo) == 0 {
 			return nil
@@ -468,15 +471,17 @@ func (d *DAG) walkAncestorsAux(v Vertex, vertices chan Vertex, signal <-chan boo
 		}
 		select {
 		case <-signal:
+			fmt.Println("signal received")
 			return nil
 		default:
 			vertices <- v
 		}
+
 	}
 }
 
 // AncestorsWalker returns a channel and subsequently returns / walks all ancestors of a vertex in a breath first order.
-func (d *DAG) AncestorsWalker(v Vertex, signal <-chan bool) (<-chan Vertex, error) {
+func (d *DAG) AncestorsWalker(v Vertex, signal chan bool) (chan Vertex, error) {
 	// sanity checking
 	if v == nil {
 		return nil, VertexNilError{}
@@ -487,7 +492,7 @@ func (d *DAG) AncestorsWalker(v Vertex, signal <-chan bool) (<-chan Vertex, erro
 	}
 	d.muDAG.RUnlock()
 	vertices := make(chan Vertex)
-	go func(vertices chan Vertex, signal <-chan bool) {
+	go func(vertices chan Vertex, signal chan bool) {
 		d.muDAG.RLock()
 		d.walkAncestorsAux(v, vertices, signal)
 		d.muDAG.RUnlock()
