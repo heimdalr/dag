@@ -6,7 +6,7 @@
 [![Go Report Card](https://goreportcard.com/badge/github.com/heimdalr/dag)](https://goreportcard.com/report/github.com/heimdalr/dag)
 [![Nutrition Facts](http://code.grevit.net/badge/O%2B%2B_S%2B%2B_I%2B_C%2B_E%2B%2B%2B_M_V%2B_PS%2B%2B_!D)](http://code.grevit.net/facts/O%2B%2B_S%2B%2B_I%2B_C%2B_E%2B%2B%2B_M_V%2B_PS%2B%2B_!D)
 
-Implementation directed acyclic graphs (DAGs).
+Implementation of directed acyclic graphs (DAGs).
 
 The implementation is fast and thread-safe. It prevents adding cycles or 
 duplicates and thereby always maintains a valid DAG. The implementation caches
