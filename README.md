@@ -1,6 +1,6 @@
 # dag
 
-[![Build Status](https://travis-ci.org/heimdalr/dag.svg?branch=master)](https://travis-ci.org/heimdalr/dag)
+[![circleci](https://circleci.com/gh/heimdalr/dag/tree/master.svg?style=shield)](https://circleci.com/gh/heimdalr/dag)
 [![codecov](https://codecov.io/gh/heimdalr/dag/branch/master/graph/badge.svg)](https://codecov.io/gh/heimdalr/dag)
 [![PkgGoDev](https://pkg.go.dev/badge/github.com/heimdalr/dag)](https://pkg.go.dev/github.com/heimdalr/dag)
 [![Go Report Card](https://goreportcard.com/badge/github.com/heimdalr/dag)](https://goreportcard.com/report/github.com/heimdalr/dag)
