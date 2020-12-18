@@ -11,19 +11,15 @@ type largeVertex struct {
 	value int
 }
 
-// implement the Vertex's interface method String()
-func (v largeVertex) String() string {
-	return fmt.Sprintf("%d", v.value)
-}
-
-// implement the Vertex's interface method Id()
-func (v largeVertex) Id() string {
+// implement the interface{}'s interface method Id()
+func (v largeVertex) ID() string {
 	return fmt.Sprintf("%d", v.value)
 }
 
 func main() {
 	d := dag.NewDAG()
-	root := &largeVertex{1}
+	root := largeVertex{1}
+	key, _ := d.AddVertex(root)
 	levels := 7
 	branches := 9
 	var start, end time.Time
@@ -39,7 +35,7 @@ func main() {
 	}
 
 	start = time.Now()
-	descendants, _ := d.GetDescendants(root)
+	descendants, _ := d.GetDescendants(key)
 	end = time.Now()
 	fmt.Printf("%fs to get descendants\n", end.Sub(start).Seconds())
 	descendantsCount := len(descendants)
@@ -49,12 +45,12 @@ func main() {
 	}
 
 	start = time.Now()
-	_, _ = d.GetDescendants(root)
+	_, _ = d.GetDescendants(key)
 	end = time.Now()
 	fmt.Printf("%fs to get descendants 2nd time\n", end.Sub(start).Seconds())
 
 	start = time.Now()
-	descendantsOrdered, _ := d.GetOrderedDescendants(root)
+	descendantsOrdered, _ := d.GetOrderedDescendants(key)
 	end = time.Now()
 	fmt.Printf("%fs to get descendants ordered\n", end.Sub(start).Seconds())
 	descendantsOrderedCount := len(descendantsOrdered)
@@ -63,7 +59,7 @@ func main() {
 	}
 
 	start = time.Now()
-	children, _ := d.GetChildren(root)
+	children, _ := d.GetChildren(key)
 	end = time.Now()
 	fmt.Printf("%fs to get children\n", end.Sub(start).Seconds())
 	childrenCount := len(children)
@@ -72,7 +68,7 @@ func main() {
 		panic(fmt.Sprintf("GetChildren(root) = %d, want %d", childrenCount, expectedChildrenCount))
 	}
 
-	_, _ = d.GetDescendants(root)
+	_, _ = d.GetDescendants(key)
 	edgeCountBefore := d.GetSize()
 	start = time.Now()
 	d.ReduceTransitively()
@@ -88,34 +84,43 @@ func main() {
 	end = time.Now()
 	fmt.Printf("%fs to transitively reduce the graph without caches poupulated\n", end.Sub(start).Seconds())
 
-	var childList []dag.Vertex
+	var childList []string
 	for x := range children {
 		childList = append(childList, x)
+		break
 	}
 	start = time.Now()
 	if len(childList) > 0 {
-		_ = d.DeleteEdge(root, childList[0])
+		_ = d.DeleteEdge(key, childList[0])
 	}
 	end = time.Now()
 	fmt.Printf("%fs to delete an edge from the root\n", end.Sub(start).Seconds())
 
 }
 
-func largeAux(d *dag.DAG, level int, branches int, parent *largeVertex) {
+func largeAux(d *dag.DAG, level int, branches int, parent largeVertex) (int, int) {
+	var vertexCount int
+	var edgeCount int
 	if level > 1 {
 		if branches < 1 || branches > 9 {
 			panic("number of branches must be between 1 and 9")
 		}
 		for i := 1; i <= branches; i++ {
-			value := (*parent).value*10 + i
-			child := &largeVertex{value}
-			err := d.AddEdge(parent, child)
+			value := parent.value*10 + i
+			child := largeVertex{value}
+			childId, _ := d.AddVertex(child)
+			vertexCount++
+			err := d.AddEdge(parent.ID(), childId)
+			edgeCount++
 			if err != nil {
 				panic(err)
 			}
-			largeAux(d, level-1, branches, child)
+			childVertexCount, childEdgeCount := largeAux(d, level-1, branches, child)
+			vertexCount += childVertexCount
+			edgeCount += childEdgeCount
 		}
 	}
+	return vertexCount, edgeCount
 }
 
 func sum(x, y, branches int, fn interface{}) int {

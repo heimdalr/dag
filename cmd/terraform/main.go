@@ -17,8 +17,8 @@ func (v largeVertex) String() string {
 	return fmt.Sprintf("%d", v.value)
 }
 
-// implement the Vertex's interface method Id()
-func (v largeVertex) Id() string {
+// implement the Vertex's interface method ID()
+func (v largeVertex) ID() string {
 	return fmt.Sprintf("%d", v.value)
 }
 */

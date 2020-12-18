@@ -3,100 +3,112 @@ package dag
 
 import (
 	"fmt"
+	"github.com/google/uuid"
 	"sync"
 )
 
-// Vertex is the interface to be implemented for the vertices of the DAG.
-type Vertex interface {
-
-	// Return a string representation of the vertex.
-	String() string
-
-	// Return the id of this vertex. This id must be unique and never change.
-	Id() string
+// IDInterface describes the interface a type must implement in order to
+// explicitly specify vertex id.
+//
+// Objects of types not implementing this interface will receive automatically
+// generated ids (as of adding them to the graph).
+type IDInterface interface {
+	ID() string
 }
 
 // DAG implements the data structure of the DAG.
 type DAG struct {
 	muDAG            sync.RWMutex
-	vertices         map[Vertex]bool
-	vertexIds        map[string]Vertex
-	inboundEdge      map[Vertex]map[Vertex]bool
-	outboundEdge     map[Vertex]map[Vertex]bool
+	vertices         map[interface{}]string
+	vertexIds        map[string]interface{}
+	inboundEdge      map[interface{}]map[interface{}]struct{}
+	outboundEdge     map[interface{}]map[interface{}]struct{}
 	muCache          sync.RWMutex
 	verticesLocked   *dMutex
-	ancestorsCache   map[Vertex]map[Vertex]bool
-	descendantsCache map[Vertex]map[Vertex]bool
+	ancestorsCache   map[interface{}]map[interface{}]struct{}
+	descendantsCache map[interface{}]map[interface{}]struct{}
 }
 
 // NewDAG creates / initializes a new DAG.
 func NewDAG() *DAG {
 	return &DAG{
-		vertices:         make(map[Vertex]bool),
-		vertexIds:        make(map[string]Vertex),
-		inboundEdge:      make(map[Vertex]map[Vertex]bool),
-		outboundEdge:     make(map[Vertex]map[Vertex]bool),
+		vertices:         make(map[interface{}]string),
+		vertexIds:        make(map[string]interface{}),
+		inboundEdge:      make(map[interface{}]map[interface{}]struct{}),
+		outboundEdge:     make(map[interface{}]map[interface{}]struct{}),
 		verticesLocked:   newDMutex(),
-		ancestorsCache:   make(map[Vertex]map[Vertex]bool),
-		descendantsCache: make(map[Vertex]map[Vertex]bool),
+		ancestorsCache:   make(map[interface{}]map[interface{}]struct{}),
+		descendantsCache: make(map[interface{}]map[interface{}]struct{}),
 	}
 }
 
 // AddVertex adds the vertex v to the DAG. AddVertex returns an error, if v is
 // nil, v is already part of the graph, or the id of v is already part of the
 // graph.
-func (d *DAG) AddVertex(v Vertex) error {
+func (d *DAG) AddVertex(v interface{}) (string, error) {
 
 	d.muDAG.Lock()
 	defer d.muDAG.Unlock()
 
 	// sanity checking
 	if v == nil {
-		return VertexNilError{}
+		return "", VertexNilError{}
 	}
 	if _, exists := d.vertices[v]; exists {
-		return VertexDuplicateError{v}
+		return "", VertexDuplicateError{v}
 	}
-	if _, exists := d.vertexIds[v.Id()]; exists {
-		return IdDuplicateError{v}
-	}
-	d.addVertex(v)
-	return nil
+
+	return d.addVertex(v)
 }
 
-func (d *DAG) addVertex(v Vertex) {
-	d.vertices[v] = true
-	d.vertexIds[v.Id()] = v
+func (d *DAG) addVertex(v interface{}) (string, error) {
+
+	var id string
+	if i, ok := v.(IDInterface); ok {
+		id = i.ID()
+		if _, exists := d.vertexIds[id]; exists {
+			return "", IDDuplicateError{id}
+		}
+	} else {
+		id = uuid.New().String()
+	}
+
+	d.vertices[v] = id
+	d.vertexIds[id] = v
+
+	return id, nil
 }
 
 // GetVertex returns a vertex by its id. GetVertex returns an error, if id is
 // the empty string or unknown.
-func (d *DAG) GetVertex(id string) (Vertex, error) {
+func (d *DAG) GetVertex(id string) (interface{}, error) {
 	d.muDAG.RLock()
 	defer d.muDAG.RUnlock()
 
 	if id == "" {
-		return nil, IdEmptyError{}
+		return nil, IDEmptyError{}
 	}
 
-	v, IdExists := d.vertexIds[id]
-	if !IdExists {
-		return nil, IdUnknownError{id}
+	v, exists := d.vertexIds[id]
+	if !exists {
+		return nil, IDUnknownError{id}
 	}
 	return v, nil
 }
 
-// DeleteVertex deletes the vertex v. DeleteVertex also deletes all attached
-// edges (inbound and outbound) as well as ancestor- and descendant-caches of
-// related vertices. DeleteVertex returns an error, if v is nil or unknown.
-func (d *DAG) DeleteVertex(v Vertex) error {
+// DeleteVertex deletes the vertex with the given id. DeleteVertex also
+// deletes all attached edges (inbound and outbound). DeleteVertex returns
+// an error, if id is empty or unknown.
+func (d *DAG) DeleteVertex(id string) error {
 
 	d.muDAG.Lock()
 	defer d.muDAG.Unlock()
 
-	if err := d.saneVertex(v); err != nil {
+	if err := d.saneID(id); err != nil {
 		return err
 	}
+
+	v := d.vertexIds[id]
 
 	// get descendents and ancestors as they are now
 	descendants := copyMap(d.getDescendants(v))
@@ -138,69 +150,63 @@ func (d *DAG) DeleteVertex(v Vertex) error {
 
 	// delete v itself
 	delete(d.vertices, v)
-	delete(d.vertexIds, v.Id())
+	delete(d.vertexIds, id)
 
 	return nil
 }
 
-// AddEdge adds an edge between src and dst. AddEdge returns an error, if src
-// or dst are nil or if the edge would create a loop. AddEdge calls AddVertex,
-// if src and/or dst are not yet known within the DAG.
-func (d *DAG) AddEdge(src Vertex, dst Vertex) error {
+// AddEdge adds an edge between srcID and dstID. AddEdge returns an
+// error, if srcID or dstID are empty strings or unknown, if the edge
+// already exists, or if the new edge would create a loop.
+func (d *DAG) AddEdge(srcID, dstID string) error {
 
 	d.muDAG.Lock()
 	defer d.muDAG.Unlock()
 
-	if src == nil || dst == nil {
-		return VertexNilError{}
-	}
-	if src == dst {
-		return SrcDstEqualError{src, dst}
+	if err := d.saneID(srcID); err != nil {
+		return err
 	}
 
-	// ensure vertices
-	if !d.vertices[src] {
-		if _, idExists := d.vertexIds[src.Id()]; idExists {
-			return IdDuplicateError{src}
-		}
-		d.addVertex(src)
+	if err := d.saneID(dstID); err != nil {
+		return err
 	}
-	if !d.vertices[dst] {
-		if _, idExists := d.vertexIds[dst.Id()]; idExists {
-			return IdDuplicateError{dst}
-		}
-		d.addVertex(dst)
+
+	if srcID == dstID {
+		return SrcDstEqualError{srcID, dstID}
 	}
+
+	src := d.vertexIds[srcID]
+	dst := d.vertexIds[dstID]
 
 	// if the edge is already known, there is nothing else to do
 	if d.isEdge(src, dst) {
-		return EdgeDuplicateError{src, dst}
+		return EdgeDuplicateError{srcID, dstID}
 	}
 
 	// get descendents and ancestors as they are now
 	descendants := copyMap(d.getDescendants(dst))
 	ancestors := copyMap(d.getAncestors(src))
 
-	// check for circles, iff desired
-	if src == dst || descendants[src] {
-		return EdgeLoopError{src, dst}
+	if _, exists := descendants[src]; exists {
+		return EdgeLoopError{srcID, dstID}
 	}
+
 
 	// prepare d.outbound[src], iff needed
 	if _, exists := d.outboundEdge[src]; !exists {
-		d.outboundEdge[src] = make(map[Vertex]bool)
+		d.outboundEdge[src] = make(map[interface{}]struct{})
 	}
 
 	// dst is a child of src
-	d.outboundEdge[src][dst] = true
+	d.outboundEdge[src][dst] = struct{}{}
 
 	// prepare d.inboundEdge[dst], iff needed
 	if _, exists := d.inboundEdge[dst]; !exists {
-		d.inboundEdge[dst] = make(map[Vertex]bool)
+		d.inboundEdge[dst] = make(map[interface{}]struct{})
 	}
 
 	// src is a parent of dst
-	d.inboundEdge[dst][src] = true
+	d.inboundEdge[dst][src] = struct{}{}
 
 	// for dst and all its descendants delete cached ancestors
 	for descendant := range descendants {
@@ -221,54 +227,66 @@ func (d *DAG) AddEdge(src Vertex, dst Vertex) error {
 	return nil
 }
 
-// IsEdge returns true, if there exists an edge between src and dst. IsEdge
-// returns false if there is no such edge. IsEdge returns an error, if src or
-// dst are nil, unknown or the same.
-func (d *DAG) IsEdge(src Vertex, dst Vertex) (bool, error) {
+// IsEdge returns true, if there exists an edge between srcID and dstID.
+// IsEdge returns false, if there is no such edge. IsEdge returns an error,
+// if srcID or dstID are empty, unknown, or the same.
+func (d *DAG) IsEdge(srcID, dstID string) (bool, error) {
 	d.muDAG.RLock()
 	defer d.muDAG.RUnlock()
 
-	if err := d.saneVertex(src); err != nil {
+	if err := d.saneID(srcID); err != nil {
 		return false, err
 	}
-	if err := d.saneVertex(dst); err != nil {
+	if err := d.saneID(dstID); err != nil {
 		return false, err
 	}
-	if src == dst {
-		return false, SrcDstEqualError{src, dst}
+	if srcID == dstID {
+		return false, SrcDstEqualError{srcID, dstID}
 	}
 
-	return d.isEdge(src, dst), nil
+	return d.isEdge(d.vertexIds[srcID], d.vertexIds[dstID]), nil
 }
 
-func (d *DAG) isEdge(src Vertex, dst Vertex) bool {
+func (d *DAG) isEdge(src, dst interface{}) bool {
 
-	_, outboundExists := d.outboundEdge[src]
-	_, inboundExists := d.inboundEdge[dst]
-
-	return outboundExists && d.outboundEdge[src][dst] &&
-		inboundExists && d.inboundEdge[dst][src]
+	if _, exists := d.outboundEdge[src]; !exists {
+		return false
+	}
+	if _, exists := d.outboundEdge[src][dst]; !exists {
+		return false
+	}
+	if _, exists := d.inboundEdge[dst]; !exists {
+		return false
+	}
+	if _, exists := d.inboundEdge[dst][src]; !exists {
+		return false
+	}
+	return true
 }
 
-// DeleteEdge deletes an edge. DeleteEdge also deletes ancestor- and
-// descendant-caches of related vertices. DeleteEdge returns an error, if src
-// or dst are nil or unknown, or if there is no edge between src and dst.
-func (d *DAG) DeleteEdge(src Vertex, dst Vertex) error {
+// DeleteEdge deletes the edge between srcID and dstID. DeleteEdge
+// returns an error, if srcID or dstID are empty or unknown, or if,
+// there is no edge between srcID and dstID.
+func (d *DAG) DeleteEdge(srcID, dstID string) error {
 
 	d.muDAG.Lock()
 	defer d.muDAG.Unlock()
 
-	if err := d.saneVertex(src); err != nil {
+	if err := d.saneID(srcID); err != nil {
 		return err
 	}
-	if err := d.saneVertex(dst); err != nil {
+	if err := d.saneID(dstID); err != nil {
 		return err
 	}
-	if src == dst {
-		return SrcDstEqualError{src, dst}
+	if srcID == dstID {
+		return SrcDstEqualError{srcID, dstID}
 	}
+
+	src := d.vertexIds[srcID]
+	dst := d.vertexIds[dstID]
+
 	if !d.isEdge(src, dst) {
-		return EdgeUnknownError{src, dst}
+		return EdgeUnknownError{srcID, dstID}
 	}
 
 	// get descendents and ancestors as they are now
@@ -320,87 +338,111 @@ func (d *DAG) getSize() int {
 	return count
 }
 
-// GetLeafs returns all vertices without children.
-func (d *DAG) GetLeafs() map[Vertex]bool {
+// GetLeaves returns all vertices without children.
+func (d *DAG) GetLeaves() map[string]interface{}{
 	d.muDAG.RLock()
 	defer d.muDAG.RUnlock()
-	return d.getLeafs()
+	return d.getLeaves()
 }
 
-func (d *DAG) getLeafs() map[Vertex]bool {
-	leafs := make(map[Vertex]bool)
+func (d *DAG) getLeaves() map[string]interface{} {
+	leaves := make(map[string]interface{})
 	for v := range d.vertices {
-		dstIds, ok := d.outboundEdge[v]
-		if !ok || len(dstIds) == 0 {
-			leafs[v] = true
+		dstIDs, ok := d.outboundEdge[v]
+		if !ok || len(dstIDs) == 0 {
+			id := d.vertices[v]
+			leaves[id] = v
 		}
 	}
-	return leafs
+	return leaves
 }
 
 // GetRoots returns all vertices without parents.
-func (d *DAG) GetRoots() map[Vertex]bool {
+func (d *DAG) GetRoots() map[string]interface{} {
 	d.muDAG.RLock()
 	defer d.muDAG.RUnlock()
 	return d.getRoots()
 }
 
-func (d *DAG) getRoots() map[Vertex]bool {
-	roots := make(map[Vertex]bool)
+func (d *DAG) getRoots() map[string]interface{} {
+	roots := make(map[string]interface{})
 	for v := range d.vertices {
-		srcIds, ok := d.inboundEdge[v]
-		if !ok || len(srcIds) == 0 {
-			roots[v] = true
+		srcIDs, ok := d.inboundEdge[v]
+		if !ok || len(srcIDs) == 0 {
+			id := d.vertices[v]
+			roots[id] = v
 		}
 	}
 	return roots
 }
 
 // GetVertices returns all vertices.
-func (d *DAG) GetVertices() map[Vertex]bool {
+func (d *DAG) GetVertices() map[string]interface{} {
 	d.muDAG.RLock()
 	defer d.muDAG.RUnlock()
-	return copyMap(d.vertices)
+	out := make(map[string]interface{})
+	for id, value := range d.vertexIds {
+		out[id] = value
+	}
+	return out
 }
 
-// GetParents returns all parents of vertex v. GetParents returns an error,
-// if v is nil or unknown.
-func (d *DAG) GetParents(v Vertex) (map[Vertex]bool, error) {
+// GetParents returns the all parents of the vertex with the id
+// id. GetParents returns an error, if id is empty or unknown.
+func (d *DAG) GetParents(id string) (map[string]interface{}, error) {
 	d.muDAG.RLock()
 	defer d.muDAG.RUnlock()
-	if err := d.saneVertex(v); err != nil {
+	if err := d.saneID(id); err != nil {
 		return nil, err
 	}
-	return copyMap(d.inboundEdge[v]), nil
+	v := d.vertexIds[id]
+	parents := make(map[string]interface{})
+	for pv := range d.inboundEdge[v] {
+		pid := d.vertices[pv]
+		parents[pid] = pv
+	}
+	return parents, nil
 }
 
-// GetChildren returns all children of vertex v. GetChildren returns an error,
-// if v is nil or unknown.
-func (d *DAG) GetChildren(v Vertex) (map[Vertex]bool, error) {
+// GetChildren returns all children of the vertex with the id
+// id. GetChildren returns an error, if id is empty or unknown.
+func (d *DAG) GetChildren(id string) (map[string]interface{}, error) {
 	d.muDAG.RLock()
 	defer d.muDAG.RUnlock()
-	if err := d.saneVertex(v); err != nil {
+	if err := d.saneID(id); err != nil {
 		return nil, err
 	}
-	return copyMap(d.outboundEdge[v]), nil
+	v := d.vertexIds[id]
+	children := make(map[string]interface{})
+	for cv := range d.outboundEdge[v] {
+		cid := d.vertices[cv]
+		children[cid] = cv
+	}
+	return children, nil
 }
 
-// GetAncestors return all ancestors of the vertex v. GetAncestors returns an
-// error, if v is nil or unknown.
+// GetAncestors return all ancestors of the vertex with the id id. GetAncestors
+// returns an error, if id is empty or unknown.
 //
 // Note, in order to get the ancestors, GetAncestors populates the ancestor-
-// cache as needed. Depending on order and size of the sub-graph of v this may
-// take a long time and consume a lot of memory.
-func (d *DAG) GetAncestors(v Vertex) (map[Vertex]bool, error) {
+// cache as needed. Depending on order and size of the sub-graph of the vertex
+// with id id this may take a long time and consume a lot of memory.
+func (d *DAG) GetAncestors(id string) (map[string]interface{}, error) {
 	d.muDAG.RLock()
 	defer d.muDAG.RUnlock()
-	if err := d.saneVertex(v); err != nil {
+	if err := d.saneID(id); err != nil {
 		return nil, err
 	}
-	return copyMap(d.getAncestors(v)), nil
+	v := d.vertexIds[id]
+	ancestors := make(map[string]interface{})
+	for av := range d.getAncestors(v){
+		aid := d.vertices[av]
+		ancestors[aid] = av
+	}
+	return ancestors, nil
 }
 
-func (d *DAG) getAncestors(v Vertex) map[Vertex]bool {
+func (d *DAG) getAncestors(v interface{}) map[interface{}]struct{} {
 
 	// in the best case we have already a populated cache
 	d.muCache.RLock()
@@ -425,7 +467,7 @@ func (d *DAG) getAncestors(v Vertex) map[Vertex]bool {
 
 	// as there is no cache, we start from scratch and first of all collect
 	// all ancestors locally
-	cache = make(map[Vertex]bool)
+	cache = make(map[interface{}]struct{})
 	var mu sync.Mutex
 	if parents, ok := d.inboundEdge[v]; ok {
 
@@ -434,9 +476,9 @@ func (d *DAG) getAncestors(v Vertex) map[Vertex]bool {
 			parentAncestors := d.getAncestors(parent)
 			mu.Lock()
 			for ancestor := range parentAncestors {
-				cache[ancestor] = true
+				cache[ancestor] = struct{}{}
 			}
-			cache[parent] = true
+			cache[parent] = struct{}{}
 			mu.Unlock()
 		}
 	}
@@ -448,57 +490,59 @@ func (d *DAG) getAncestors(v Vertex) map[Vertex]bool {
 	return cache
 }
 
-// GetOrderedAncestors returns all ancestors of the vertex v in a breath-first
-// order. Only the first occurrence of each vertex is returned.
-// GetOrderedAncestors returns an error, if v is nil or unknown.
+// GetOrderedAncestors returns all ancestors of the vertex with id id
+// in a breath-first order. Only the first occurrence of each vertex is
+// returned. GetOrderedAncestors returns an error, if id is empty or
+// unknown.
 //
 // Note, there is no order between sibling vertices. Two consecutive runs of
 // GetOrderedAncestors may return different results.
-func (d *DAG) GetOrderedAncestors(v Vertex) ([]Vertex, error) {
+func (d *DAG) GetOrderedAncestors(id string) ([]string, error) {
 	d.muDAG.RLock()
 	defer d.muDAG.RUnlock()
-	vertices, _, err := d.AncestorsWalker(v)
+	ids, _, err := d.AncestorsWalker(id)
 	if err != nil {
 		return nil, err
 	}
-	var ancestors []Vertex
-	for v := range vertices {
-		ancestors = append(ancestors, v)
+	var ancestors []string
+	for aid := range ids {
+		ancestors = append(ancestors, aid)
 	}
 	return ancestors, nil
 }
 
 // AncestorsWalker returns a channel and subsequently returns / walks all
-// ancestors of the vertex v in a breath first order. The second channel
-// returned may be used to stop further walking. AncestorsWalker returns an
-// error, if v is nil or unknown.
+// ancestors of the vertex with id id in a breath first order. The second
+// channel returned may be used to stop further walking. AncestorsWalker
+// returns an error, if id is empty or unknown.
 //
 // Note, there is no order between sibling vertices. Two consecutive runs of
 // AncestorsWalker may return different results.
-func (d *DAG) AncestorsWalker(v Vertex) (chan Vertex, chan bool, error) {
+func (d *DAG) AncestorsWalker(id string) (chan string, chan bool, error) {
 	d.muDAG.RLock()
 	defer d.muDAG.RUnlock()
-	if err := d.saneVertex(v); err != nil {
+	if err := d.saneID(id); err != nil {
 		return nil, nil, err
 	}
-	vertices := make(chan Vertex)
+	ids := make(chan string)
 	signal := make(chan bool, 1)
 	go func() {
 		d.muDAG.RLock()
-		d.walkAncestors(v, vertices, signal)
+		v := d.vertexIds[id]
+		d.walkAncestors(v, ids, signal)
 		d.muDAG.RUnlock()
-		close(vertices)
+		close(ids)
 		close(signal)
 	}()
-	return vertices, signal, nil
+	return ids, signal, nil
 }
 
-func (d *DAG) walkAncestors(v Vertex, vertices chan Vertex, signal chan bool) {
+func (d *DAG) walkAncestors(v interface{}, ids chan string, signal chan bool) {
 
-	var fifo []Vertex
-	visited := make(map[Vertex]bool)
+	var fifo []interface{}
+	visited := make(map[interface{}]struct{})
 	for parent := range d.inboundEdge[v] {
-		visited[parent] = true
+		visited[parent] = struct{}{}
 		fifo = append(fifo, parent)
 	}
 	for {
@@ -508,8 +552,8 @@ func (d *DAG) walkAncestors(v Vertex, vertices chan Vertex, signal chan bool) {
 		top := fifo[0]
 		fifo = fifo[1:]
 		for parent := range d.inboundEdge[top] {
-			if !visited[parent] {
-				visited[parent] = true
+			if _, exists := visited[parent];  !exists {
+				visited[parent] = struct{}{}
 				fifo = append(fifo, parent)
 			}
 		}
@@ -517,27 +561,37 @@ func (d *DAG) walkAncestors(v Vertex, vertices chan Vertex, signal chan bool) {
 		case <-signal:
 			return
 		default:
-			vertices <- top
+			ids <- d.vertices[top]
 		}
 	}
 }
 
-// GetDescendants return all ancestors of the vertex v. GetDescendants returns
-// an error, if v is nil or unknown.
+// GetDescendants return all ancestors of the vertex with id id.
+// GetDescendants returns an error, if id is empty or unknown.
 //
 // Note, in order to get the descendants, GetDescendants populates the
-// descendants-cache as needed. Depending on order and size of the sub-graph of
-// v this may take a long time and consume a lot of memory.
-func (d *DAG) GetDescendants(v Vertex) (map[Vertex]bool, error) {
+// descendants-cache as needed. Depending on order and size of the sub-graph
+// of the vertex with id id this may take a long time and consume a lot
+// of memory.
+func (d *DAG) GetDescendants(id string) (map[string]interface{}, error) {
 	d.muDAG.RLock()
 	defer d.muDAG.RUnlock()
-	if err := d.saneVertex(v); err != nil {
+
+	if err := d.saneID(id); err != nil {
 		return nil, err
 	}
-	return copyMap(d.getDescendants(v)), nil
+	v := d.vertexIds[id]
+	//return copyMap(d.getAncestors(v)), nil
+
+	descendants := make(map[string]interface{})
+	for dv := range d.getDescendants(v){
+		did := d.vertices[dv]
+		descendants[did] = dv
+	}
+	return descendants, nil
 }
 
-func (d *DAG) getDescendants(v Vertex) map[Vertex]bool {
+func (d *DAG) getDescendants(v interface{}) map[interface{}]struct{} {
 
 	// in the best case we have already a populated cache
 	d.muCache.RLock()
@@ -562,7 +616,7 @@ func (d *DAG) getDescendants(v Vertex) map[Vertex]bool {
 
 	// as there is no cache, we start from scratch and first of all collect
 	// all descendants locally
-	cache = make(map[Vertex]bool)
+	cache = make(map[interface{}]struct{})
 	var mu sync.Mutex
 	if children, ok := d.outboundEdge[v]; ok {
 
@@ -570,13 +624,13 @@ func (d *DAG) getDescendants(v Vertex) map[Vertex]bool {
 		//var waitGroup sync.WaitGroup
 		//waitGroup.Add(len(children))
 		for child := range children {
-			//go func(child Vertex, mu *sync.Mutex, cache map[Vertex]bool) {
+			//go func(child interface{}, mu *sync.Mutex, cache map[interface{}]bool) {
 			childDescendants := d.getDescendants(child)
 			mu.Lock()
 			for descendant := range childDescendants {
-				cache[descendant] = true
+				cache[descendant] = struct{}{}
 			}
-			cache[child] = true
+			cache[child] = struct{}{}
 			mu.Unlock()
 			//waitGroup.Done()
 			//}(child, &mu, cache)
@@ -591,56 +645,58 @@ func (d *DAG) getDescendants(v Vertex) map[Vertex]bool {
 	return cache
 }
 
-// GetOrderedDescendants returns all descendants of the vertex v in a breath-
-// first order. Only the first occurrence of each vertex is returned.
-// GetOrderedDescendants returns an error, if v is nil or unknown.
+// GetOrderedDescendants returns all descendants of the vertex with id id
+// in a breath-first order. Only the first occurrence of each vertex is
+// returned. GetOrderedDescendants returns an error, if id is empty or
+// unknown.
 //
 // Note, there is no order between sibling vertices. Two consecutive runs of
 // GetOrderedDescendants may return different results.
-func (d *DAG) GetOrderedDescendants(v Vertex) ([]Vertex, error) {
+func (d *DAG) GetOrderedDescendants(id string) ([]string, error) {
 	d.muDAG.RLock()
 	defer d.muDAG.RUnlock()
-	vertices, _, err := d.DescendantsWalker(v)
+	ids, _, err := d.DescendantsWalker(id)
 	if err != nil {
 		return nil, err
 	}
-	var descendants []Vertex
-	for v := range vertices {
-		descendants = append(descendants, v)
+	var descendants []string
+	for did := range ids {
+		descendants = append(descendants, did)
 	}
 	return descendants, nil
 }
 
 // DescendantsWalker returns a channel and subsequently returns / walks all
-// descendants of the vertex v in a breath first order. The second channel
-// returned may be used to stop further walking. DescendantsWalker returns an
-// error, if v is nil or unknown.
+// descendants of the vertex with id id in a breath first order. The second
+// channel returned may be used to stop further walking. DescendantsWalker
+// returns an error, if id is empty or unknown.
 //
 // Note, there is no order between sibling vertices. Two consecutive runs of
 // DescendantsWalker may return different results.
-func (d *DAG) DescendantsWalker(v Vertex) (chan Vertex, chan bool, error) {
+func (d *DAG) DescendantsWalker(id string) (chan string, chan bool, error) {
 	d.muDAG.RLock()
 	defer d.muDAG.RUnlock()
-	if err := d.saneVertex(v); err != nil {
+	if err := d.saneID(id); err != nil {
 		return nil, nil, err
 	}
-	vertices := make(chan Vertex)
+	ids := make(chan string)
 	signal := make(chan bool, 1)
 	go func() {
 		d.muDAG.RLock()
-		d.walkDescendants(v, vertices, signal)
+		v := d.vertexIds[id]
+		d.walkDescendants(v, ids, signal)
 		d.muDAG.RUnlock()
-		close(vertices)
+		close(ids)
 		close(signal)
 	}()
-	return vertices, signal, nil
+	return ids, signal, nil
 }
 
-func (d *DAG) walkDescendants(v Vertex, vertices chan Vertex, signal chan bool) {
-	var fifo []Vertex
-	visited := make(map[Vertex]bool)
+func (d *DAG) walkDescendants(v interface{}, ids chan string, signal chan bool) {
+	var fifo []interface{}
+	visited := make(map[interface{}]struct{})
 	for child := range d.outboundEdge[v] {
-		visited[child] = true
+		visited[child] = struct{}{}
 		fifo = append(fifo, child)
 	}
 	for {
@@ -650,8 +706,8 @@ func (d *DAG) walkDescendants(v Vertex, vertices chan Vertex, signal chan bool) 
 		top := fifo[0]
 		fifo = fifo[1:]
 		for child := range d.outboundEdge[top] {
-			if !visited[child] {
-				visited[child] = true
+			if _, exists := visited[child];  !exists {
+				visited[child] = struct{}{}
 				fifo = append(fifo, child)
 			}
 		}
@@ -659,7 +715,7 @@ func (d *DAG) walkDescendants(v Vertex, vertices chan Vertex, signal chan bool) 
 		case <-signal:
 			return
 		default:
-			vertices <- top
+			ids <- d.vertices[top]
 		}
 	}
 }
@@ -677,7 +733,7 @@ func (d *DAG) ReduceTransitively() {
 	graphChanged := false
 
 	// populate the descendents cache for all roots (i.e. the whole graph)
-	for root := range d.getRoots() {
+	for _, root := range d.getRoots() {
 		_ = d.getDescendants(root)
 	}
 
@@ -685,14 +741,14 @@ func (d *DAG) ReduceTransitively() {
 	for v := range d.vertices {
 
 		// map of descendants of the children of v
-		descendentsOfChildrenOfV := make(map[Vertex]bool)
+		descendentsOfChildrenOfV := make(map[interface{}]struct{})
 
 		// for each child of v
 		for childOfV := range d.outboundEdge[v] {
 
 			// collect child descendants
 			for descendent := range d.descendantsCache[childOfV] {
-				descendentsOfChildrenOfV[descendent] = true
+				descendentsOfChildrenOfV[descendent] = struct{}{}
 			}
 		}
 
@@ -701,7 +757,7 @@ func (d *DAG) ReduceTransitively() {
 
 			// remove the edge between v and child, iff child is a
 			// descendants of any of the children of v
-			if descendentsOfChildrenOfV[childOfV] {
+			if _, exists := descendentsOfChildrenOfV[childOfV]; exists {
 				delete(d.outboundEdge[v], childOfV)
 				delete(d.inboundEdge[childOfV], v)
 				graphChanged = true
@@ -726,47 +782,48 @@ func (d *DAG) FlushCaches() {
 }
 
 func (d *DAG) flushCaches() {
-	d.ancestorsCache = make(map[Vertex]map[Vertex]bool)
-	d.descendantsCache = make(map[Vertex]map[Vertex]bool)
+	d.ancestorsCache = make(map[interface{}]map[interface{}]struct{})
+	d.descendantsCache = make(map[interface{}]map[interface{}]struct{})
 }
 
-// String return a textual representation of the graph.
+// String returns a textual representation of the graph.
 func (d *DAG) String() string {
 	result := fmt.Sprintf("DAG Vertices: %d - Edges: %d\n", d.GetOrder(), d.GetSize())
 	result += fmt.Sprintf("Vertices:\n")
 	d.muDAG.RLock()
 	for k := range d.vertices {
-		result += fmt.Sprintf("  %v\n", k.String())
+		result += fmt.Sprintf("  %v\n", k)
 	}
 	result += fmt.Sprintf("Edges:\n")
 	for v, children := range d.outboundEdge {
 		for child := range children {
-			result += fmt.Sprintf("  %s -> %s\n", v.String(), child.String())
+			result += fmt.Sprintf("  %v -> %v\n", v, child)
 		}
 	}
 	d.muDAG.RUnlock()
 	return result
 }
 
-func (d *DAG) saneVertex(v Vertex) error {
+func (d *DAG) saneID(id string) error {
 	// sanity checking
-	if v == nil {
-		return VertexNilError{}
+	if id == "" {
+		return IDEmptyError{}
 	}
-	_, exists := d.vertices[v]
+	_, exists := d.vertexIds[id]
 	if !exists {
-		return VertexUnknownError{v}
+		return IDUnknownError{id}
 	}
 	return nil
 }
 
-func copyMap(in map[Vertex]bool) map[Vertex]bool {
-	out := make(map[Vertex]bool)
-	for key, value := range in {
-		out[key] = value
+func copyMap(in map[interface{}]struct{}) map[interface{}]struct{} {
+	out := make(map[interface{}]struct{})
+	for id, value := range in {
+		out[id] = value
 	}
 	return out
 }
+
 
 /***************************
 ********** Errors **********
@@ -781,106 +838,97 @@ func (e VertexNilError) Error() string {
 	return fmt.Sprint("don't know what to do with 'nil'")
 }
 
-// IdEmptyError is the error type to describe the situation, that a nil is
-// given instead of a vertex.
-type IdEmptyError struct{}
-
-// Implements the error interface.
-func (e IdEmptyError) Error() string {
-	return fmt.Sprint("don't know what to do with 'nil'")
-}
-
 // VertexDuplicateError is the error type to describe the situation, that a
 // given vertex already exists in the graph.
 type VertexDuplicateError struct {
-	v Vertex
+	v interface{}
 }
 
 // Implements the error interface.
 func (e VertexDuplicateError) Error() string {
-	return fmt.Sprintf("'%s' is already known", e.v.String())
+	return fmt.Sprintf("'%v' is already known", e.v)
 }
 
-// IdDuplicateError is the error type to describe the situation, that a given
+// IDDuplicateError is the error type to describe the situation, that a given
 // vertex id already exists in the graph.
-type IdDuplicateError struct {
-	v Vertex
-}
-
-// Implements the error interface.
-func (e IdDuplicateError) Error() string {
-	return fmt.Sprintf("the id '%s' is already known", e.v.Id())
-}
-
-// VertexUnknownError is the error type to describe the situation, that a given
-// vertex does not exit in the graph.
-type VertexUnknownError struct {
-	v Vertex
-}
-
-// Implements the error interface.
-func (e VertexUnknownError) Error() string {
-	return fmt.Sprintf("'%s' is unknown", e.v.String())
-}
-
-// IdUnknownError is the error type to describe the situation, that a given
-// vertex does not exit in the graph.
-type IdUnknownError struct {
+type IDDuplicateError struct {
 	id string
 }
 
 // Implements the error interface.
-func (e IdUnknownError) Error() string {
+func (e IDDuplicateError) Error() string {
+	return fmt.Sprintf("the id '%s' is already known", e.id)
+}
+
+// IDEmptyError is the error type to describe the situation, that a an empty
+// string is given instead of a valid id.
+type IDEmptyError struct{}
+
+// Implements the error interface.
+func (e IDEmptyError) Error() string {
+	return fmt.Sprint("don't know what to do with \"\"")
+}
+
+// IDUnknownError is the error type to describe the situation, that a given
+// vertex does not exit in the graph.
+type IDUnknownError struct {
+	id string
+}
+
+// Implements the error interface.
+func (e IDUnknownError) Error() string {
 	return fmt.Sprintf("'%s' is unknown", e.id)
 }
 
 // EdgeDuplicateError is the error type to describe the situation, that an edge
 // already exists in the graph.
 type EdgeDuplicateError struct {
-	src Vertex
-	dst Vertex
+	src string
+	dst string
 }
 
 // Implements the error interface.
 func (e EdgeDuplicateError) Error() string {
-	return fmt.Sprintf("edge between '%s' and '%s' is already known", e.src.String(), e.dst.String())
+	return fmt.Sprintf("edge between '%s' and '%s' is already known", e.src, e.dst)
 }
 
 // EdgeUnknownError is the error type to describe the situation, that a given
 // edge does not exit in the graph.
 type EdgeUnknownError struct {
-	src Vertex
-	dst Vertex
+	src string
+	dst string
 }
 
 // Implements the error interface.
 func (e EdgeUnknownError) Error() string {
-	return fmt.Sprintf("edge between '%s' and '%s' is unknown", e.src.String(), e.dst.String())
+	return fmt.Sprintf("edge between '%s' and '%s' is unknown", e.src, e.dst)
 }
 
 // EdgeLoopError is the error type to describe loop errors (i.e. errors that
 // where raised to prevent establishing loops in the graph).
 type EdgeLoopError struct {
-	src Vertex
-	dst Vertex
+	src string
+	dst string
 }
 
 // Implements the error interface.
 func (e EdgeLoopError) Error() string {
-	return fmt.Sprintf("edge between '%s' and '%s' would create a loop", e.src.String(), e.dst.String())
+	return fmt.Sprintf("edge between '%s' and '%s' would create a loop", e.src, e.dst)
 }
+
 
 // SrcDstEqualError is the error type to describe the situation, that src and
 // dst are equal.
 type SrcDstEqualError struct {
-	src Vertex
-	dst Vertex
+	src string
+	dst string
 }
 
 // Implements the error interface.
 func (e SrcDstEqualError) Error() string {
-	return fmt.Sprintf("src ('%s') and dst ('%s') equal", e.src.String(), e.dst.String())
+	return fmt.Sprintf("src ('%s') and dst ('%s') equal", e.src, e.dst)
 }
+
 
 /***************************
 ********** dMutex **********
