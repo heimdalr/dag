@@ -134,17 +134,13 @@ func (d *DAG) DeleteVertex(id string) error {
 
 	// for v and all its descendants delete cached ancestors
 	for descendant := range descendants {
-		if _, exists := d.ancestorsCache[descendant]; exists {
-			delete(d.ancestorsCache, descendant)
-		}
+		delete(d.ancestorsCache, descendant)
 	}
 	delete(d.ancestorsCache, v)
 
 	// for v and all its ancestors delete cached descendants
 	for ancestor := range ancestors {
-		if _, exists := d.descendantsCache[ancestor]; exists {
-			delete(d.descendantsCache, ancestor)
-		}
+		delete(d.descendantsCache, ancestor)
 	}
 	delete(d.descendantsCache, v)
 
@@ -210,17 +206,13 @@ func (d *DAG) AddEdge(srcID, dstID string) error {
 
 	// for dst and all its descendants delete cached ancestors
 	for descendant := range descendants {
-		if _, exists := d.ancestorsCache[descendant]; exists {
-			delete(d.ancestorsCache, descendant)
-		}
+		delete(d.ancestorsCache, descendant)
 	}
 	delete(d.ancestorsCache, dst)
 
 	// for src and all its ancestors delete cached descendants
 	for ancestor := range ancestors {
-		if _, exists := d.descendantsCache[ancestor]; exists {
-			delete(d.descendantsCache, ancestor)
-		}
+		delete(d.descendantsCache, ancestor)
 	}
 	delete(d.descendantsCache, src)
 
@@ -299,17 +291,13 @@ func (d *DAG) DeleteEdge(srcID, dstID string) error {
 
 	// for src and all its descendants delete cached ancestors
 	for descendant := range descendants {
-		if _, exists := d.ancestorsCache[descendant]; exists {
-			delete(d.ancestorsCache, descendant)
-		}
+		delete(d.ancestorsCache, descendant)
 	}
 	delete(d.ancestorsCache, src)
 
 	// for dst and all its ancestors delete cached descendants
 	for ancestor := range ancestors {
-		if _, exists := d.descendantsCache[ancestor]; exists {
-			delete(d.descendantsCache, ancestor)
-		}
+		delete(d.descendantsCache, ancestor)
 	}
 	delete(d.descendantsCache, dst)
 
@@ -789,12 +777,12 @@ func (d *DAG) flushCaches() {
 // String returns a textual representation of the graph.
 func (d *DAG) String() string {
 	result := fmt.Sprintf("DAG Vertices: %d - Edges: %d\n", d.GetOrder(), d.GetSize())
-	result += fmt.Sprintf("Vertices:\n")
+	result += "Vertices:\n"
 	d.muDAG.RLock()
 	for k := range d.vertices {
 		result += fmt.Sprintf("  %v\n", k)
 	}
-	result += fmt.Sprintf("Edges:\n")
+	result += "Edges:\n"
 	for v, children := range d.outboundEdge {
 		for child := range children {
 			result += fmt.Sprintf("  %v -> %v\n", v, child)
@@ -835,7 +823,7 @@ type VertexNilError struct{}
 
 // Implements the error interface.
 func (e VertexNilError) Error() string {
-	return fmt.Sprint("don't know what to do with 'nil'")
+	return "don't know what to do with 'nil'"
 }
 
 // VertexDuplicateError is the error type to describe the situation, that a
@@ -866,7 +854,7 @@ type IDEmptyError struct{}
 
 // Implements the error interface.
 func (e IDEmptyError) Error() string {
-	return fmt.Sprint("don't know what to do with \"\"")
+	return "don't know what to do with \"\""
 }
 
 // IDUnknownError is the error type to describe the situation, that a given
