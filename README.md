@@ -1,6 +1,6 @@
 # dag
 
-[![run tests](https://github.com/heimdalr/dag/workflows/run%20tests/badge.svg?branch=master)](https://github.com/heimdalr/dag/actions?query=branch%3Amaster)
+[![run tests](https://github.com/heimdalr/dag/workflows/Run%20Tests/badge.svg?branch=master)](https://github.com/heimdalr/dag/actions?query=branch%3Amaster)
 [![PkgGoDev](https://pkg.go.dev/badge/github.com/heimdalr/dag)](https://pkg.go.dev/github.com/heimdalr/dag)
 [![Go Report Card](https://goreportcard.com/badge/github.com/heimdalr/dag)](https://goreportcard.com/report/github.com/heimdalr/dag)
 
