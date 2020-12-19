@@ -26,5 +26,5 @@ jobs:
           prerelease: false
       - name: Update Index
         run: |
-          curl https://sum.golang.org/lookup/github.com/$GITHUB_REPOSITORY@${{ github.ref }}
+          curl "https://sum.golang.org/lookup/github.com/${GITHUB_REPOSITORY}@${GITHUB_REF##*/}"
         
