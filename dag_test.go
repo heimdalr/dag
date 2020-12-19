@@ -6,21 +6,21 @@ import (
 	"testing"
 )
 
-type iVertex struct {
-	value int
+type iVertex struct{ value int }
+
+func (v iVertex) ID() string { return fmt.Sprintf("%d", v.value) }
+
+type foobar struct {
+	A string
+	B string
 }
-type foobar struct{A string; B string}
-type foobarKey struct{A string; B string; MyID string}
-func (o foobarKey) ID() string {
-	return o.MyID
+type foobarKey struct {
+	A    string
+	B    string
+	MyID string
 }
 
-
-
-// implement the interface{}'s interface method Id()
-func (v iVertex) ID() string {
-	return fmt.Sprintf("%d", v.value)
-}
+func (o foobarKey) ID() string { return o.MyID }
 
 func TestNewDAG(t *testing.T) {
 	dag := NewDAG()
@@ -91,7 +91,6 @@ func TestDAG_AddVertex(t *testing.T) {
 
 }
 
-
 func TestDAG_GetVertex(t *testing.T) {
 	dag := NewDAG()
 	v1 := iVertex{1}
@@ -129,7 +128,6 @@ func TestDAG_GetVertex(t *testing.T) {
 		t.Errorf("GetVertex() = %v, want %v", v5, v4)
 	}
 
-
 	// unknown
 	_, errUnknown := dag.GetVertex("foo")
 	if errUnknown == nil {
@@ -152,7 +150,6 @@ func TestDAG_GetVertex(t *testing.T) {
 func TestDAG_DeleteVertex(t *testing.T) {
 	dag := NewDAG()
 	v1, _ := dag.AddVertex(iVertex{1})
-
 
 	// delete a single vertex and inspect the graph
 	err := dag.DeleteVertex(v1)
@@ -695,7 +692,6 @@ func TestDAG_AncestorsWalker(t *testing.T) {
 	v9, _ := dag.AddVertex("9")
 	v10, _ := dag.AddVertex("101")
 
-
 	_ = dag.AddEdge(v1, v2)
 	_ = dag.AddEdge(v1, v3)
 	_ = dag.AddEdge(v2, v4)
@@ -859,33 +855,6 @@ func TestErrors(t *testing.T) {
 	}
 }
 
-func Example() {
-
-	// initialize a new graph
-	d := NewDAG()
-
-	// init three vertices
-	v1, _ := d.AddVertex(1)
-	v2, _ := d.AddVertex(2)
-	v3, _ := d.AddVertex(struct{a string; b string}{a: "foo", b: "bar"})
-
-	// add the above vertices and connect them with two edges
-	_ = d.AddEdge(v1, v2)
-	_ = d.AddEdge(v1, v3)
-
-	// describe the graph
-	fmt.Print(d.String())
-
-	// Unordered output:
-	// DAG Vertices: 3 - Edges: 2
-	// Vertices:
-	//   1
-	//   2
-	//   {foo bar}
-	// Edges:
-	//   1 -> 2
-	//   1 -> {foo bar}
-}
 
 func ExampleDAG_AncestorsWalker() {
 	dag := NewDAG()
@@ -914,10 +883,6 @@ func ExampleDAG_AncestorsWalker() {
 	// Output:
 	//   [4 2]
 }
-
-
-
-
 
 func TestLarge(t *testing.T) {
 	d := NewDAG()
