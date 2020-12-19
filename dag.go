@@ -187,7 +187,6 @@ func (d *DAG) AddEdge(srcID, dstID string) error {
 		return EdgeLoopError{srcID, dstID}
 	}
 
-
 	// prepare d.outbound[src], iff needed
 	if _, exists := d.outboundEdge[src]; !exists {
 		d.outboundEdge[src] = make(map[interface{}]struct{})
@@ -327,7 +326,7 @@ func (d *DAG) getSize() int {
 }
 
 // GetLeaves returns all vertices without children.
-func (d *DAG) GetLeaves() map[string]interface{}{
+func (d *DAG) GetLeaves() map[string]interface{} {
 	d.muDAG.RLock()
 	defer d.muDAG.RUnlock()
 	return d.getLeaves()
@@ -423,7 +422,7 @@ func (d *DAG) GetAncestors(id string) (map[string]interface{}, error) {
 	}
 	v := d.vertexIds[id]
 	ancestors := make(map[string]interface{})
-	for av := range d.getAncestors(v){
+	for av := range d.getAncestors(v) {
 		aid := d.vertices[av]
 		ancestors[aid] = av
 	}
@@ -540,7 +539,7 @@ func (d *DAG) walkAncestors(v interface{}, ids chan string, signal chan bool) {
 		top := fifo[0]
 		fifo = fifo[1:]
 		for parent := range d.inboundEdge[top] {
-			if _, exists := visited[parent];  !exists {
+			if _, exists := visited[parent]; !exists {
 				visited[parent] = struct{}{}
 				fifo = append(fifo, parent)
 			}
@@ -572,7 +571,7 @@ func (d *DAG) GetDescendants(id string) (map[string]interface{}, error) {
 	//return copyMap(d.getAncestors(v)), nil
 
 	descendants := make(map[string]interface{})
-	for dv := range d.getDescendants(v){
+	for dv := range d.getDescendants(v) {
 		did := d.vertices[dv]
 		descendants[did] = dv
 	}
@@ -694,7 +693,7 @@ func (d *DAG) walkDescendants(v interface{}, ids chan string, signal chan bool) 
 		top := fifo[0]
 		fifo = fifo[1:]
 		for child := range d.outboundEdge[top] {
-			if _, exists := visited[child];  !exists {
+			if _, exists := visited[child]; !exists {
 				visited[child] = struct{}{}
 				fifo = append(fifo, child)
 			}
@@ -812,7 +811,6 @@ func copyMap(in map[interface{}]struct{}) map[interface{}]struct{} {
 	return out
 }
 
-
 /***************************
 ********** Errors **********
 ****************************/
@@ -904,7 +902,6 @@ func (e EdgeLoopError) Error() string {
 	return fmt.Sprintf("edge between '%s' and '%s' would create a loop", e.src, e.dst)
 }
 
-
 // SrcDstEqualError is the error type to describe the situation, that src and
 // dst are equal.
 type SrcDstEqualError struct {
@@ -916,7 +913,6 @@ type SrcDstEqualError struct {
 func (e SrcDstEqualError) Error() string {
 	return fmt.Sprintf("src ('%s') and dst ('%s') equal", e.src, e.dst)
 }
-
 
 /***************************
 ********** dMutex **********
