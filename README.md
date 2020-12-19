@@ -1,10 +1,8 @@
 # dag
 
-[![circleci](https://circleci.com/gh/heimdalr/dag/tree/master.svg?style=shield)](https://circleci.com/gh/heimdalr/dag)
-[![codecov](https://codecov.io/gh/heimdalr/dag/branch/master/graph/badge.svg)](https://codecov.io/gh/heimdalr/dag)
+![run tests](https://github.com/heimdalr/dag/workflows/run%20tests/badge.svg)
 [![PkgGoDev](https://pkg.go.dev/badge/github.com/heimdalr/dag)](https://pkg.go.dev/github.com/heimdalr/dag)
 [![Go Report Card](https://goreportcard.com/badge/github.com/heimdalr/dag)](https://goreportcard.com/report/github.com/heimdalr/dag)
-[![Nutrition Facts](http://code.grevit.net/badge/O%2B%2B_S%2B%2B_I%2B_C%2B_E%2B%2B%2B_M_V%2B_PS%2B%2B_!D)](http://code.grevit.net/facts/O%2B%2B_S%2B%2B_I%2B_C%2B_E%2B%2B%2B_M_V%2B_PS%2B%2B_!D)
 
 Implementation of directed acyclic graphs (DAGs).
 
