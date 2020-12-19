@@ -27,4 +27,4 @@ jobs:
       - name: Update Index
         run: |
           curl -s "https://sum.golang.org/lookup/github.com/${GITHUB_REPOSITORY}@${GITHUB_REF##*/}"
-          curl -s "https://pkg.go.dev/github.com/${GITHUB_REPOSITORY}@${GITHUB_REF##*/}"        
+          curl -s "https://proxy.golang.org/github.com/${GITHUB_REPOSITORY}/@v/${GITHUB_REF##*/}.info"        
