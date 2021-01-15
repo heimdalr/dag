@@ -9,7 +9,7 @@ Implementation of directed acyclic graphs (DAGs).
 
 The implementation is fast and thread-safe. It prevents adding cycles or 
 duplicates and thereby always maintains a valid DAG. The implementation caches
- descendants and ancestors to speed up subsequent calls. 
+descendants and ancestors to speed up subsequent calls. 
 
 <!--
 github.com/heimdalr/dag:
