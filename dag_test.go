@@ -1098,7 +1098,6 @@ func TestDAG_Copy(t *testing.T) {
 			t.Errorf("got %v, want %v", v2, v1)
 		}
 	}
-
 }
 
 func TestDAG_String(t *testing.T) {
