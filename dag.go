@@ -865,6 +865,24 @@ func (d *DAG) flushCaches() {
 	d.descendantsCache = make(map[interface{}]map[interface{}]struct{})
 }
 
+// Copy returns a copy of the DAG.
+func (d *DAG) Copy() (newDAG *DAG, err error) {
+
+	// create a new dag
+	newDAG = NewDAG()
+
+	// create a map of visited vertices
+	visited := make(map[interface{}]string)
+
+	// add all roots and their descendants to the new DAG
+	for _, root := range d.GetRoots() {
+		if _, err = d.getRelativesGraphRec(root, newDAG, visited, false); err != nil {
+			return
+		}
+	}
+	return
+}
+
 // String returns a textual representation of the graph.
 func (d *DAG) String() string {
 	result := fmt.Sprintf("DAG Vertices: %d - Edges: %d\n", d.GetOrder(), d.GetSize())
