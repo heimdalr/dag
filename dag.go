@@ -452,8 +452,7 @@ func (d *DAG) getAncestors(v interface{}) map[interface{}]struct{} {
 		return cache
 	}
 
-	// as there is no cache, we start from scratch and first of all collect
-	// all ancestors locally
+	// as there is no cache, we start from scratch and collect all ancestors locally
 	cache = make(map[interface{}]struct{})
 	var mu sync.Mutex
 	if parents, ok := d.inboundEdge[v]; ok {
@@ -553,7 +552,7 @@ func (d *DAG) walkAncestors(v interface{}, ids chan string, signal chan bool) {
 	}
 }
 
-// GetDescendants return all ancestors of the vertex with id id.
+// GetDescendants return all descendants of the vertex with id id.
 // GetDescendants returns an error, if id is empty or unknown.
 //
 // Note, in order to get the descendants, GetDescendants populates the
@@ -601,8 +600,8 @@ func (d *DAG) getDescendants(v interface{}) map[interface{}]struct{} {
 		return cache
 	}
 
-	// as there is no cache, we start from scratch and first of all collect
-	// all descendants locally
+	// as there is no cache, we start from scratch and collect all descendants
+	// locally
 	cache = make(map[interface{}]struct{})
 	var mu sync.Mutex
 	if children, ok := d.outboundEdge[v]; ok {
@@ -651,6 +650,99 @@ func (d *DAG) GetOrderedDescendants(id string) ([]string, error) {
 		descendants = append(descendants, did)
 	}
 	return descendants, nil
+}
+
+// GetDescendantsGraph returns a new DAG consisting of the vertex with id id and
+// all its descendants (i.e. the subgraph). GetDescendantsGraph also returns the
+// id of the (copy of the) given vertex within the new graph (i.e. the id of the
+// single root of the new graph). GetDescendantsGraph returns an error, if id is
+// empty or unknown.
+//
+// Note, the new graph is a copy of the relevant part of the original graph.
+func (d *DAG) GetDescendantsGraph(id string) (*DAG, string, error) {
+
+	// recursively add the current vertex and all its descendants
+	return d.getRelativesGraph(id, false)
+}
+
+// GetAncestorsGraph returns a new DAG consisting of the vertex with id id and
+// all its ancestors (i.e. the subgraph). GetAncestorsGraph also returns the id
+// of the (copy of the) given vertex within the new graph (i.e. the id of the
+// single leaf of the new graph). GetAncestorsGraph returns an error, if id is
+// empty or unknown.
+//
+// Note, the new graph is a copy of the relevant part of the original graph.
+func (d *DAG) GetAncestorsGraph(id string) (*DAG, string, error) {
+
+	// recursively add the current vertex and all its ancestors
+	return d.getRelativesGraph(id, true)
+}
+
+func (d *DAG) getRelativesGraph(id string, asc bool) (*DAG, string, error) {
+	// sanity checking
+	if id == "" {
+		return nil, "", IDEmptyError{}
+	}
+	v, exists := d.vertexIds[id]
+	if !exists {
+		return nil, "", IDUnknownError{id}
+	}
+
+	// create a new dag
+	newDAG := NewDAG()
+
+	// recursively add the current vertex and all its relatives
+	newId, err := d.getRelativesGraphRec(v, newDAG, make(map[interface{}]string), asc)
+	return newDAG, newId, err
+}
+
+func (d *DAG) getRelativesGraphRec(v interface{}, newDAG *DAG, visited map[interface{}]string, asc bool) (newId string, err error) {
+
+	// copy this vertex to the new graph
+	if newId, err = newDAG.AddVertex(v); err != nil {
+		return
+	}
+
+	// mark this vertex as visited
+	visited[v] = newId
+
+	// get the direct relatives (depending on the direction either parents or children)
+	var relatives map[interface{}]struct{}
+	var ok bool
+	if asc {
+		relatives, ok = d.inboundEdge[v]
+	} else {
+		relatives, ok = d.outboundEdge[v]
+	}
+
+	// for all direct relatives in the original graph
+	if ok {
+		for relative := range relatives {
+
+			// if we haven't seen this relative
+			relativeId, exists := visited[relative]
+			if !exists {
+
+				// recursively add this relative
+				if relativeId, err = d.getRelativesGraphRec(relative, newDAG, visited, asc); err != nil {
+					return
+				}
+			}
+
+			// add edge to this relative (depending on the direction)
+			var srcID, dstID string
+			if asc {
+				srcID, dstID = relativeId, newId
+
+			} else {
+				srcID, dstID = newId, relativeId
+			}
+			if err = newDAG.AddEdge(srcID, dstID); err != nil {
+				return
+			}
+		}
+	}
+	return
 }
 
 // DescendantsWalker returns a channel and subsequently returns / walks all
@@ -743,7 +835,7 @@ func (d *DAG) ReduceTransitively() {
 		for childOfV := range d.outboundEdge[v] {
 
 			// remove the edge between v and child, iff child is a
-			// descendants of any of the children of v
+			// descendant of any of the children of v
 			if _, exists := descendentsOfChildrenOfV[childOfV]; exists {
 				delete(d.outboundEdge[v], childOfV)
 				delete(d.inboundEdge[childOfV], v)
@@ -761,7 +853,7 @@ func (d *DAG) ReduceTransitively() {
 // FlushCaches completely flushes the descendants- and ancestor cache.
 //
 // Note, the only reason to call this method is to free up memory.
-// Otherwise the caches are automatically maintained.
+// Normally the caches are automatically maintained.
 func (d *DAG) FlushCaches() {
 	d.muDAG.Lock()
 	defer d.muDAG.Unlock()
@@ -846,7 +938,7 @@ func (e IDDuplicateError) Error() string {
 	return fmt.Sprintf("the id '%s' is already known", e.id)
 }
 
-// IDEmptyError is the error type to describe the situation, that a an empty
+// IDEmptyError is the error type to describe the situation, that an empty
 // string is given instead of a valid id.
 type IDEmptyError struct{}
 
@@ -954,7 +1046,7 @@ func (d *dMutex) lock(i interface{}) {
 	// remember the mutex for later
 	mutex := &d.mutexes[i].mutex
 
-	// as the cMutex is there, we have increased the count and we know the
+	// as the cMutex is there, we have increased the count, and we know the
 	// instance mutex, we can release the global lock
 	d.globalMutex.Unlock()
 
@@ -975,7 +1067,7 @@ func (d *dMutex) unlock(i interface{}) {
 	// mutex
 	d.mutexes[i].count--
 
-	// if we where the last one interested in this instance mutex delete the
+	// if we are the last one interested in this instance mutex delete the
 	// cMutex
 	if d.mutexes[i].count == 0 {
 		delete(d.mutexes, i)

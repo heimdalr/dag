@@ -91,6 +91,35 @@ func TestDAG_AddVertex(t *testing.T) {
 
 }
 
+func TestDAG_AddVertex2(t *testing.T) {
+	dag := NewDAG()
+	type testType struct{ value string }
+
+	v := testType{"1"}
+	id, _ := dag.AddVertex(v)
+	vNew, _ := dag.GetVertex(id)
+	vNewCasted, _ := vNew.(testType)
+	if v != vNew {
+		t.Errorf("want %v, got %v", v, vNewCasted)
+	}
+	if &v == &vNewCasted {
+		t.Errorf("pointers shouldn't be equal but %p == %p", &v, &vNewCasted)
+	}
+	id, _ = dag.AddVertex(&v)
+	vNew, _ = dag.GetVertex(id)
+	vNewPtr, _ := vNew.(*testType)
+	if v != *vNewPtr {
+		t.Errorf("want %v, got %v", v, *vNewPtr)
+	}
+	if &v != vNewPtr {
+		t.Errorf("pointers should be equal but %p != %p", &v, vNewPtr)
+	}
+	v.value = "20"
+	if vNewPtr.value != v.value {
+		t.Errorf("values not updated. want %s, got %s", v.value, vNewPtr.value)
+	}
+}
+
 func TestDAG_GetVertex(t *testing.T) {
 	dag := NewDAG()
 	v1 := iVertex{1}
@@ -547,8 +576,7 @@ func TestDAG_GetOrderedDescendants(t *testing.T) {
 	if desc, _ := dag.GetOrderedDescendants(v4); len(desc) != 0 {
 		t.Errorf("GetOrderedDescendants(v4) = %d, want 0", len(desc))
 	}
-	if desc, _ := dag.GetOrderedDescendants(v1);
-		!equal(desc, []string{v2, v3, v4}) && !equal(desc, []string{v2, v4, v3}) {
+	if desc, _ := dag.GetOrderedDescendants(v1); !equal(desc, []string{v2, v3, v4}) && !equal(desc, []string{v2, v4, v3}) {
 		t.Errorf("GetOrderedDescendants(v4) = %v, want %v or %v", desc, []string{v2, v3, v4}, []string{v2, v4, v3})
 	}
 
@@ -568,6 +596,207 @@ func TestDAG_GetOrderedDescendants(t *testing.T) {
 	}
 	if _, ok := errUnknown.(IDUnknownError); !ok {
 		t.Errorf("GetOrderedDescendants(\"foo\") expected IDUnknownError, got %T", errUnknown)
+	}
+}
+
+func TestDAG_GetDescendantsGraph(t *testing.T) {
+	d0 := NewDAG()
+
+	v1 := iVertex{1}
+	v1ID, _ := d0.AddVertex(v1)
+	_, _ = d0.AddVertex(iVertex{2})
+	_, _ = d0.AddVertex(iVertex{3})
+	_, _ = d0.AddVertex(iVertex{4})
+	_, _ = d0.AddVertex(iVertex{5})
+	v6 := iVertex{6}
+	v6ID, _ := d0.AddVertex(v6)
+	_, _ = d0.AddVertex(iVertex{7})
+	_, _ = d0.AddVertex(iVertex{8})
+	v9ID, _ := d0.AddVertex(iVertex{9})
+
+	_ = d0.AddEdge("1", "2")
+	_ = d0.AddEdge("2", "3")
+	_ = d0.AddEdge("2", "4")
+	_ = d0.AddEdge("3", "5")
+	_ = d0.AddEdge("4", "5")
+	_ = d0.AddEdge("5", "6")
+	_ = d0.AddEdge("6", "7")
+	_ = d0.AddEdge("6", "8")
+
+	// basic tests -- 2 children
+	d, newId, err := d0.GetDescendantsGraph(v6ID)
+	if err != nil {
+		t.Error(err)
+	}
+	if d == nil {
+		t.Error("GetDescendantsGraph(v6ID) returned nil")
+	}
+	if newId == "" {
+		t.Error("GetDescendantsGraph(v6ID) returned empty new id")
+	}
+	if newId != v6ID {
+		t.Errorf("GetDescendantsGraph(v6ID) returned new id %s, want %s", newId, v6ID)
+	}
+	if d.GetOrder() != 3 {
+		t.Errorf("GetOrder() = %d, want 3", d.GetOrder())
+	}
+	if d.GetSize() != 2 {
+		t.Errorf("GetSize() = %d, want 2", d.GetSize())
+	}
+	roots := d.GetRoots()
+	if len(roots) != 1 {
+		t.Errorf("len(GetRoots()) = %d, want 1", len(roots))
+	}
+	if _, exists := roots[newId]; !exists {
+		t.Errorf("%s is not the root of the new graph", newId)
+	}
+	if v6 != roots[newId] {
+		t.Errorf("wrong root got = %v, want %v", v6, roots[newId])
+	}
+
+	// test duplicates
+	d2, newId2, err2 := d0.GetDescendantsGraph(v1ID)
+	if err2 != nil {
+		t.Error(err2)
+	}
+	if d2 == nil {
+		t.Error("GetDescendantsGraph(v1ID) returned nil")
+	}
+	if newId2 == "" {
+		t.Error("GetDescendantsGraph(v1ID) returned empty new id")
+	}
+	if newId2 != v1ID {
+		t.Errorf("GetDescendantsGraph(v1ID) returned new id %s, want %s", newId2, v1ID)
+	}
+	newVertex, _ := d2.GetVertex(newId2)
+	if v1 != newVertex {
+		t.Errorf("want = %v, got %v", v1, newVertex)
+	}
+	if d2.GetOrder() != 8 {
+		t.Errorf("GetOrder() = %d, want 3", d2.GetOrder())
+	}
+	if d2.GetSize() != 8 {
+		t.Errorf("GetSize() = %d, want 8", d2.GetSize())
+	}
+	roots2 := d2.GetRoots()
+	if len(roots2) != 1 {
+		t.Errorf("len(GetRoots()) = %d, want 1", len(roots2))
+	}
+	if _, exists2 := roots2[newId2]; !exists2 {
+		t.Errorf("%s is not the root of the new graph", newId2)
+	}
+	if v1 != roots2[newId2] {
+		t.Errorf("wrong root got = %v, want %v", v1, roots2[newId2])
+	}
+	_, errGetUnknown := d2.GetVertex(v9ID)
+	if errGetUnknown == nil {
+		t.Errorf("GetVertex(v9ID) = nil, want %T", IDUnknownError{v9ID})
+	}
+	if _, ok := errGetUnknown.(IDUnknownError); !ok {
+		t.Errorf("GetVertex(v9ID) expected IDUnknownError, got %T", errGetUnknown)
+	}
+
+	// nil
+	_, _, errNil := d0.GetDescendantsGraph("")
+	if errNil == nil {
+		t.Errorf("GetDescendantsGraph(\"\") = nil, want %T", IDEmptyError{})
+	}
+	if _, ok := errNil.(IDEmptyError); !ok {
+		t.Errorf("GetDescendantsGraph(\"\") expected IDEmptyError, got %T", errNil)
+	}
+
+	// unknown
+	_, _, errUnknown := d0.GetDescendantsGraph("foo")
+	if errUnknown == nil {
+		t.Errorf("GetDescendantsGraph(\"foo\") = nil, want %T", IDUnknownError{"foo"})
+	}
+	if _, ok := errUnknown.(IDUnknownError); !ok {
+		t.Errorf("GetDescendantsGraph(\"foo\") expected IDUnknownError, got %T", errUnknown)
+	}
+}
+
+func TestDAG_GetAncestorsGraph(t *testing.T) {
+	d0 := NewDAG()
+
+	_, _ = d0.AddVertex(iVertex{1})
+	_, _ = d0.AddVertex(iVertex{2})
+	_, _ = d0.AddVertex(iVertex{3})
+	_, _ = d0.AddVertex(iVertex{4})
+	v5 := iVertex{5}
+	v5ID, _ := d0.AddVertex(v5)
+	_, _ = d0.AddVertex(iVertex{6})
+	_, _ = d0.AddVertex(iVertex{7})
+	_, _ = d0.AddVertex(iVertex{8})
+	v9ID, _ := d0.AddVertex(iVertex{9})
+
+	_ = d0.AddEdge("1", "2")
+	_ = d0.AddEdge("2", "3")
+	_ = d0.AddEdge("2", "4")
+	_ = d0.AddEdge("3", "5")
+	_ = d0.AddEdge("4", "5")
+	_ = d0.AddEdge("5", "6")
+	_ = d0.AddEdge("6", "7")
+	_ = d0.AddEdge("6", "8")
+
+	// basic tests -- 2 children
+	d, newId, err := d0.GetAncestorsGraph(v5ID)
+	if err != nil {
+		t.Error(err)
+	}
+	if d == nil {
+		t.Error("GetAncestorsGraph(v5ID) returned nil")
+	}
+	if newId == "" {
+		t.Error("GetAncestorsGraph(v5ID) returned empty new id")
+	}
+	if newId != v5ID {
+		t.Errorf("GetAncestorsGraph(v5ID) returned new id %s, want %s", newId, v5ID)
+	}
+	if d.GetOrder() != 5 {
+		t.Errorf("GetOrder() = %d, want 5", d.GetOrder())
+	}
+	if d.GetSize() != 5 {
+		t.Errorf("GetSize() = %d, want 5", d.GetSize())
+	}
+	roots := d.GetRoots()
+	if len(roots) != 1 {
+		t.Errorf("len(GetRoots()) = %d, want 1", len(roots))
+	}
+	leaves := d.GetLeaves()
+	if len(leaves) != 1 {
+		t.Errorf("len(GetRoots()) = %d, want 1", len(leaves))
+	}
+	if _, exists := leaves[newId]; !exists {
+		t.Errorf("%s is not the leaves of the new graph", newId)
+	}
+	if v5 != leaves[newId] {
+		t.Errorf("wrong leaf got = %v, want %v", v5, leaves[newId])
+	}
+
+	_, errGetUnknown := d.GetVertex(v9ID)
+	if errGetUnknown == nil {
+		t.Errorf("GetVertex(v9ID) = nil, want %T", IDUnknownError{v9ID})
+	}
+	if _, ok := errGetUnknown.(IDUnknownError); !ok {
+		t.Errorf("GetVertex(v9ID) expected IDUnknownError, got %T", errGetUnknown)
+	}
+
+	// nil
+	_, _, errNil := d0.GetAncestorsGraph("")
+	if errNil == nil {
+		t.Errorf("GetDescendantsGraph(\"\") = nil, want %T", IDEmptyError{})
+	}
+	if _, ok := errNil.(IDEmptyError); !ok {
+		t.Errorf("GetDescendantsGraph(\"\") expected IDEmptyError, got %T", errNil)
+	}
+
+	// unknown
+	_, _, errUnknown := d0.GetAncestorsGraph("foo")
+	if errUnknown == nil {
+		t.Errorf("GetDescendantsGraph(\"foo\") = nil, want %T", IDUnknownError{"foo"})
+	}
+	if _, ok := errUnknown.(IDUnknownError); !ok {
+		t.Errorf("GetDescendantsGraph(\"foo\") expected IDUnknownError, got %T", errUnknown)
 	}
 }
 
@@ -854,7 +1083,6 @@ func TestErrors(t *testing.T) {
 		})
 	}
 }
-
 
 func ExampleDAG_AncestorsWalker() {
 	dag := NewDAG()
