@@ -3,7 +3,6 @@ package main
 import (
 	"fmt"
 	"github.com/heimdalr/dag"
-
 )
 
 func main() {

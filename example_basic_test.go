@@ -9,6 +9,7 @@ type foobar struct {
 	a string
 	b string
 }
+
 func Example() {
 
 	// initialize a new graph
@@ -36,4 +37,3 @@ func Example() {
 	//   1 -> 2
 	//   1 -> {foo bar}
 }
-
