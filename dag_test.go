@@ -3,6 +3,7 @@ package dag
 import (
 	"fmt"
 	"github.com/go-test/deep"
+	"strconv"
 	"testing"
 )
 
@@ -1044,6 +1045,60 @@ func TestDAG_ReduceTransitively(t *testing.T) {
 	if last != mailSend {
 		t.Errorf("ordered[length-1]) = %v, want %v", last, mailSend)
 	}
+}
+
+func TestDAG_Copy(t *testing.T) {
+	d0 := NewDAG()
+
+	_, _ = d0.AddVertex(iVertex{1})
+	_, _ = d0.AddVertex(iVertex{2})
+	_, _ = d0.AddVertex(iVertex{3})
+	_, _ = d0.AddVertex(iVertex{4})
+	_, _ = d0.AddVertex(iVertex{5})
+	_, _ = d0.AddVertex(iVertex{6})
+	_, _ = d0.AddVertex(iVertex{7})
+	_, _ = d0.AddVertex(iVertex{8})
+	_, _ = d0.AddVertex(iVertex{9})
+
+	_ = d0.AddEdge("1", "2")
+	_ = d0.AddEdge("2", "3")
+	_ = d0.AddEdge("2", "4")
+	_ = d0.AddEdge("3", "5")
+	_ = d0.AddEdge("4", "5")
+	_ = d0.AddEdge("5", "6")
+	_ = d0.AddEdge("6", "7")
+	_ = d0.AddEdge("6", "8")
+
+	d1, err := d0.Copy()
+	if err != nil {
+		t.Error(err)
+	}
+	if d1.GetOrder() != d0.GetOrder() {
+		t.Errorf("got %d, want %d", d1.GetOrder(), d0.GetOrder())
+	}
+	if d1.GetSize() != d0.GetSize() {
+		t.Errorf("got %d, want %d", d1.GetSize(), d0.GetSize())
+	}
+	if len(d1.GetRoots()) != len(d0.GetRoots()) {
+		t.Errorf("got %d, want %d", len(d1.GetRoots()), len(d0.GetRoots()))
+	}
+	if len(d1.GetLeaves()) != len(d0.GetLeaves()) {
+		t.Errorf("got %d, want %d", len(d1.GetLeaves()), len(d0.GetLeaves()))
+	}
+	for i := 1; i < 9; i++ {
+		v1, errGet1 := d1.GetVertex(strconv.Itoa(i))
+		if errGet1 != nil {
+			t.Error(errGet1)
+		}
+		v2, errGet2 := d1.GetVertex(strconv.Itoa(i))
+		if errGet2 != nil {
+			t.Error(errGet2)
+		}
+		if v2 != v1 {
+			t.Errorf("got %v, want %v", v2, v1)
+		}
+	}
+
 }
 
 func TestDAG_String(t *testing.T) {
