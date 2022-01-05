@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"github.com/heimdalr/dag"
 )
+
 type idVertex struct {
 	id  string
 	msg string
