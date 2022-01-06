@@ -691,6 +691,10 @@ func (d *DAG) getRelativesGraph(id string, asc bool) (*DAG, string, error) {
 	// create a new dag
 	newDAG := NewDAG()
 
+	// protect the graph from modification
+	d.muDAG.RLock()
+	defer d.muDAG.RUnlock()
+
 	// recursively add the current vertex and all its relatives
 	newId, err := d.getRelativesGraphRec(v, newDAG, make(map[interface{}]string), asc)
 	return newDAG, newId, err
@@ -873,6 +877,10 @@ func (d *DAG) Copy() (newDAG *DAG, err error) {
 
 	// create a map of visited vertices
 	visited := make(map[interface{}]string)
+
+	// protect the graph from modification
+	d.muDAG.RLock()
+	defer d.muDAG.RUnlock()
 
 	// add all roots and their descendants to the new DAG
 	for _, root := range d.GetRoots() {
