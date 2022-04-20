@@ -50,14 +50,6 @@ func (d *DAG) AddVertex(v interface{}) (string, error) {
 	d.muDAG.Lock()
 	defer d.muDAG.Unlock()
 
-	// sanity checking
-	if v == nil {
-		return "", VertexNilError{}
-	}
-	if _, exists := d.vertices[v]; exists {
-		return "", VertexDuplicateError{v}
-	}
-
 	return d.addVertex(v)
 }
 
@@ -66,17 +58,43 @@ func (d *DAG) addVertex(v interface{}) (string, error) {
 	var id string
 	if i, ok := v.(IDInterface); ok {
 		id = i.ID()
-		if _, exists := d.vertexIds[id]; exists {
-			return "", IDDuplicateError{id}
-		}
 	} else {
 		id = uuid.New().String()
+	}
+
+	err := d.addVertexByID(id, v)
+	return id, err
+}
+
+// AddVertexByID adds the vertex v and the specified id to the DAG.
+// AddVertexByID returns an error, if v is nil, v is already part of the graph,
+// or the specified id is already part of the graph.
+func (d *DAG) AddVertexByID(id string, v interface{}) error {
+
+	d.muDAG.Lock()
+	defer d.muDAG.Unlock()
+
+	return d.addVertexByID(id, v)
+}
+
+func (d *DAG) addVertexByID(id string, v interface{}) error {
+
+	// sanity checking
+	if v == nil {
+		return VertexNilError{}
+	}
+	if _, exists := d.vertices[v]; exists {
+		return VertexDuplicateError{v}
+	}
+
+	if _, exists := d.vertexIds[id]; exists {
+		return IDDuplicateError{id}
 	}
 
 	d.vertices[v] = id
 	d.vertexIds[id] = v
 
-	return id, nil
+	return nil
 }
 
 // GetVertex returns a vertex by its id. GetVertex returns an error, if id is
@@ -396,6 +414,10 @@ func (d *DAG) GetParents(id string) (map[string]interface{}, error) {
 func (d *DAG) GetChildren(id string) (map[string]interface{}, error) {
 	d.muDAG.RLock()
 	defer d.muDAG.RUnlock()
+	return d.getChildren(id)
+}
+
+func (d *DAG) getChildren(id string) (map[string]interface{}, error) {
 	if err := d.saneID(id); err != nil {
 		return nil, err
 	}
