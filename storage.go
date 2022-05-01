@@ -10,9 +10,9 @@ var (
 // Vertexer is the interface that wraps the basic Vertex method.
 // Vertex returns an id that identifies this vertex and the value of this vertex.
 //
-// The reason for defining this new structure is
-// because the vertex id may be automatically generated when the caller adds a vertex.
-// At this time, the vertex structure added by the user does not contain id information.
+// The reason for defining this new structure is that the vertex id may be
+// automatically generated when the caller adds a vertex. At this time, the
+// vertex structure added by the user does not contain id information.
 type Vertexer interface {
 	Vertex() (id string, value interface{})
 }
