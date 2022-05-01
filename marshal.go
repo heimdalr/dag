@@ -16,14 +16,14 @@ func (d *DAG) MarshalJSON() ([]byte, error) {
 }
 
 // UnmarshalJSON is an informative method. See the UnmarshalJSON function below.
-func (d *DAG) UnmarshalJSON(data []byte) error {
-	return errors.New("This method is not supported, request function UnmarshalJSON instead")
+func (d *DAG) UnmarshalJSON(_ []byte) error {
+	return errors.New("this method is not supported, request function UnmarshalJSON instead")
 }
 
 // UnmarshalJSON parses the JSON-encoded data that defined by StorableDAG.
 // It returns a new DAG defined by the vertices and edges of wd.
 // If the internal structure of data and wd do not match,
-// then deserialization will fail and return json eror
+// then deserialization will fail and return json error.
 //
 // Because the vertex data passed in by the user is an interface{},
 // it does not indicate a specific structure, so it cannot be deserialized.
@@ -49,10 +49,16 @@ func UnmarshalJSON(data []byte, wd StorableDAG) (*DAG, error) {
 	}
 	dag := NewDAG()
 	for _, v := range wd.Vertices() {
-		dag.AddVertexByID(v.Vertex())
+		errVertex := dag.AddVertexByID(v.Vertex())
+		if errVertex != nil {
+			return nil, errVertex
+		}
 	}
 	for _, e := range wd.Edges() {
-		dag.AddEdge(e.Edge())
+		errEdge := dag.AddEdge(e.Edge())
+		if errEdge != nil {
+			return nil, errEdge
+		}
 	}
 	return dag, nil
 }

@@ -13,15 +13,6 @@ func (tv testVertex) Vertex() (id string, value interface{}) {
 	return tv.WID, tv.Val
 }
 
-type testEdge struct {
-	SrcID string `json:"s"`
-	DstID string `json:"d"`
-}
-
-func (e testEdge) Edge() (srcID, dstID string) {
-	return e.SrcID, e.DstID
-}
-
 type testStorableDAG struct {
 	StorableVertices []testVertex   `json:"vs"`
 	StorableEdges    []storableEdge `json:"es"`
