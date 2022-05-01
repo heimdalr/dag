@@ -121,6 +121,53 @@ func TestDAG_AddVertex2(t *testing.T) {
 	}
 }
 
+func TestDAG_AddVertexByID(t *testing.T) {
+	dag := NewDAG()
+
+	// add a single vertex and inspect the graph
+	v := iVertex{1}
+	id := "1"
+	_ = dag.AddVertexByID(id, v)
+	if id != v.ID() {
+		t.Errorf("GetOrder().ID() = %s, want %s", id, v.ID())
+	}
+	vertices := dag.GetVertices()
+	if vertices := len(vertices); vertices != 1 {
+		t.Errorf("GetVertices() = %d, want 1", vertices)
+	}
+
+	if _, exists := vertices[id]; !exists {
+		t.Errorf("GetVertices()[id] = false, want true")
+	}
+
+	// duplicate
+	errDuplicate := dag.AddVertexByID(id, v)
+	if errDuplicate == nil {
+		t.Errorf("AddVertexByID(id, v) = nil, want %T", VertexDuplicateError{v})
+	}
+	if _, ok := errDuplicate.(VertexDuplicateError); !ok {
+		t.Errorf("AddVertexByID(id, v) expected VertexDuplicateError, got %T", errDuplicate)
+	}
+
+	// duplicate
+	_, errIDDuplicate := dag.AddVertex(foobarKey{MyID: "1"})
+	if errIDDuplicate == nil {
+		t.Errorf("AddVertex(foobarKey{MyID: \"1\"}) = nil, want %T", IDDuplicateError{"1"})
+	}
+	if _, ok := errIDDuplicate.(IDDuplicateError); !ok {
+		t.Errorf("AddVertex(foobarKey{MyID: \"1\"}) expected IDDuplicateError, got %T", errIDDuplicate)
+	}
+
+	// nil
+	errNil := dag.AddVertexByID("2", nil)
+	if errNil == nil {
+		t.Errorf(`AddVertexByID("2", nil) = nil, want %T`, VertexNilError{})
+	}
+	if _, ok := errNil.(VertexNilError); !ok {
+		t.Errorf(`AddVertexByID("2", nil) expected VertexNilError, got %T`, errNil)
+	}
+}
+
 func TestDAG_GetVertex(t *testing.T) {
 	dag := NewDAG()
 	v1 := iVertex{1}
