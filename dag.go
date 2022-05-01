@@ -325,6 +325,10 @@ func (d *DAG) DeleteEdge(srcID, dstID string) error {
 func (d *DAG) GetOrder() int {
 	d.muDAG.RLock()
 	defer d.muDAG.RUnlock()
+	return d.getOrder()
+}
+
+func (d *DAG) getOrder() int {
 	return len(d.vertices)
 }
 
