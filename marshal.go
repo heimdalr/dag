@@ -11,7 +11,7 @@ import (
 // and uses an internal structure to store vertices and edges.
 func (d *DAG) MarshalJSON() ([]byte, error) {
 	mv := newMarshalVisitor(d)
-	DFSWalk(d, mv)
+	d.DFSWalk(mv)
 	return json.Marshal(mv.storableDAG)
 }
 
@@ -76,6 +76,9 @@ func (mv *marshalVisitor) Visit(v Vertexer) {
 	mv.StorableVertices = append(mv.StorableVertices, v)
 
 	srcID, _ := v.Vertex()
+	// Why not use Mutex here?
+	// Because at the time of Walk,
+	// the read lock has been used to protect the dag.
 	children, _ := mv.d.getChildren(srcID)
 	ids := vertexIDs(children)
 	for _, dstID := range ids {

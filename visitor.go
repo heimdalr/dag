@@ -17,7 +17,7 @@ type Visitor interface {
 // DFSWalk implements the Depth-First-Search algorithm to traverse the entire DAG.
 // The algorithm starts at the root node and explores as far as possible
 // along each branch before backtracking.
-func DFSWalk(d *DAG, visitor Visitor) {
+func (d *DAG) DFSWalk(visitor Visitor) {
 	d.muDAG.RLock()
 	defer d.muDAG.RUnlock()
 
@@ -30,11 +30,16 @@ func DFSWalk(d *DAG, visitor Visitor) {
 		stack.Push(sv)
 	}
 
+	visited := make(map[string]bool, d.getSize())
+
 	for !stack.Empty() {
 		v, _ := stack.Pop()
 		sv := v.(storableVertex)
 
-		visitor.Visit(sv)
+		if !visited[sv.WrappedID] {
+			visited[sv.WrappedID] = true
+			visitor.Visit(sv)
+		}
 
 		vertices, _ := d.getChildren(sv.WrappedID)
 		for _, id := range reversedVertexIDs(vertices) {
@@ -48,7 +53,7 @@ func DFSWalk(d *DAG, visitor Visitor) {
 // BFSWalk implements the Breadth-First-Search algorithm to traverse the entire DAG.
 // It starts at the tree root and explores all nodes at the present depth prior
 // to moving on to the nodes at the next depth level.
-func BFSWalk(d *DAG, visitor Visitor) {
+func (d *DAG) BFSWalk(visitor Visitor) {
 	d.muDAG.RLock()
 	defer d.muDAG.RUnlock()
 
@@ -61,11 +66,16 @@ func BFSWalk(d *DAG, visitor Visitor) {
 		queue.Enqueue(sv)
 	}
 
+	visited := make(map[string]bool, d.getOrder())
+
 	for !queue.Empty() {
 		v, _ := queue.Dequeue()
 		sv := v.(storableVertex)
 
-		visitor.Visit(sv)
+		if !visited[sv.WrappedID] {
+			visited[sv.WrappedID] = true
+			visitor.Visit(sv)
+		}
 
 		vertices, _ := d.getChildren(sv.WrappedID)
 		for _, id := range vertexIDs(vertices) {
