@@ -2,7 +2,7 @@ package dag_test
 
 import (
 	"fmt"
-	"github.com/heimdalr/dag"
+	"github.com/yaoguais/dag"
 )
 
 type foobar struct {
