@@ -451,7 +451,6 @@ func TestDAG_DeleteEdge(t *testing.T) {
 	}
 
 	// unknown
-
 	errUnknownSrc := dag.DeleteEdge("foo", v1)
 	if errUnknownSrc == nil {
 		t.Errorf("DeleteEdge(foo, v1) = nil, want %T", IDUnknownError{})
@@ -465,6 +464,56 @@ func TestDAG_DeleteEdge(t *testing.T) {
 	}
 	if _, ok := errUnknownDst.(IDUnknownError); !ok {
 		t.Errorf("DeleteEdge(v0, \"foo\") expected IDUnknownError, got %T", errUnknownDst)
+	}
+}
+
+func TestDAG_IsLeaf(t *testing.T) {
+	dag := NewDAG()
+	v1, _ := dag.AddVertex("1")
+	v2, _ := dag.AddVertex("2")
+	v3, _ := dag.AddVertex("3")
+
+	_ = dag.AddEdge(v1, v2)
+	_ = dag.AddEdge(v1, v3)
+	if isLeaf, _ := dag.IsLeaf(v1); isLeaf {
+		t.Errorf("IsLeaf(v1) = true, want false")
+	}
+	if isLeaf, _ := dag.IsLeaf(v2); !isLeaf {
+		t.Errorf("IsLeaf(v2) = false, want true")
+	}
+	if isLeaf, _ := dag.IsLeaf(v3); !isLeaf {
+		t.Errorf("IsLeaf(v3) = false, want true")
+	}
+	if _, err := dag.IsLeaf("foo"); err == nil {
+		t.Errorf("IsLeaf(foo) = nil, want %T", IDUnknownError{})
+	}
+	if _, err := dag.IsLeaf(""); err == nil {
+		t.Errorf("IsLeaf(\"\") = nil, want %T", IDEmptyError{})
+	}
+}
+
+func TestDAG_IsRoot(t *testing.T) {
+	dag := NewDAG()
+	v1, _ := dag.AddVertex("1")
+	v2, _ := dag.AddVertex("2")
+	v3, _ := dag.AddVertex("3")
+
+	_ = dag.AddEdge(v1, v2)
+	_ = dag.AddEdge(v1, v3)
+	if isRoot, _ := dag.IsRoot(v1); !isRoot {
+		t.Errorf("IsRoot(v1) = false, want true")
+	}
+	if isRoot, _ := dag.IsRoot(v2); isRoot {
+		t.Errorf("IsRoot(v2) = true, want false")
+	}
+	if isRoot, _ := dag.IsRoot(v3); isRoot {
+		t.Errorf("IsRoot(v3) = true, want false")
+	}
+	if _, err := dag.IsRoot("foo"); err == nil {
+		t.Errorf("IsRoot(foo) = nil, want %T", IDUnknownError{})
+	}
+	if _, err := dag.IsRoot(""); err == nil {
+		t.Errorf("IsRoot(\"\") = nil, want %T", IDEmptyError{})
 	}
 }
 
