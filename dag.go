@@ -881,9 +881,14 @@ type FlowResult struct {
 
 type FlowCallback func(d *DAG, id string, parentResults []FlowResult) interface{}
 
-func (d *DAG) DescendantsFlow(startID string, input []FlowResult, f FlowCallback) []FlowResult {
+func (d *DAG) DescendantsFlow(startID string, input []FlowResult, f FlowCallback) ([]FlowResult, error) {
 	d.muDAG.RLock()
 	defer d.muDAG.RUnlock()
+
+	// sanity checking
+	if err := d.saneID(startID); err != nil {
+		return nil, err
+	}
 
 	// Get IDs of all descendant vertices.
 	// TODO: use getDescendants() not to do the locking and sanity checking
@@ -980,7 +985,7 @@ func (d *DAG) DescendantsFlow(startID string, input []FlowResult, f FlowCallback
 		results[i] = <-outputChannel
 	}
 
-	return results
+	return results, nil
 }
 
 // ReduceTransitively transitively reduce the graph.
