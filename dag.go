@@ -869,30 +869,40 @@ func (d *DAG) walkDescendants(v interface{}, ids chan string, signal chan bool) 
 	}
 }
 
-// FlowResult is the result to be returned by a worker
+// FlowResult describes the data to be passed between vertices in a DescendantsFlow.
 type FlowResult struct {
 
-	// the id of the vertex, this worker has been working on
+	// The id of the vertex that produced this result.
 	ID string
 
-	// the actual result
+	// The actual result.
 	Result interface{}
+
+	// Any error. Note, DescendantsFlow does not care about this error. It is up to
+	// the FlowCallback of downstream vertices to handle the error as needed - if
+	// needed.
+	Error error
 }
 
-type FlowCallback func(d *DAG, id string, parentResults []FlowResult) interface{}
+// FlowCallback is the signature of the (callback-) function to call for each
+// vertex within a DescendantsFlow, after all its parents have finished their
+// work. The parameters of the function are the (complete) DAG, the current
+// vertex ID, and the results of all its parents. An instance of FlowCallback
+// should return a result or an error.
+type FlowCallback func(d *DAG, id string, parentResults []FlowResult) (interface{}, error)
 
-func (d *DAG) DescendantsFlow(startID string, input []FlowResult, f FlowCallback) ([]FlowResult, error) {
+// DescendantsFlow traverses descendants of the given start vertex (startID). For
+// each descendant it executes the given (callback-) function (FlowCallback), if all parents
+// have finished their work. The
+func (d *DAG) DescendantsFlow(startID string, inputs []FlowResult, callback FlowCallback) ([]FlowResult, error) {
 	d.muDAG.RLock()
 	defer d.muDAG.RUnlock()
 
-	// sanity checking
-	if err := d.saneID(startID); err != nil {
-		return nil, err
-	}
-
 	// Get IDs of all descendant vertices.
-	// TODO: use getDescendants() not to do the locking and sanity checking
-	flowIDs, _ := d.GetDescendants(startID)
+	flowIDs, errDes := d.GetDescendants(startID)
+	if errDes != nil {
+		return []FlowResult{}, errDes
+	}
 
 	// inputChannels provides for input channels for each of the descendant vertices (+ the start-vertex).
 	inputChannels := make(map[string]chan FlowResult, len(flowIDs)+1)
@@ -905,8 +915,10 @@ func (d *DAG) DescendantsFlow(startID string, input []FlowResult, f FlowCallback
 	for id := range flowIDs {
 
 		// Get all parents of this vertex.
-		// TODO: use a new getParents() not to do the locking and sanity checking
-		parents, _ := d.GetParents(id)
+		parents, errPar := d.GetParents(id)
+		if errPar != nil {
+			return []FlowResult{}, errPar
+		}
 
 		// Create a buffered input channel that has capacity for all parent results.
 		inputChannels[id] = make(chan FlowResult, len(parents))
@@ -915,13 +927,16 @@ func (d *DAG) DescendantsFlow(startID string, input []FlowResult, f FlowCallback
 			leafCount += 1
 		}
 	}
+
+	// outputChannel caries the results of leaf vertices.
 	outputChannel := make(chan FlowResult, leafCount)
 
-	// To also process the start vertex and to have its results being passed to
-	// its children, add it to the vertex IDs and have nil as its input channel.
+	// To also process the start vertex and to have its results being passed to its
+	// children, add it to the vertex IDs. Also add an input channel for the start
+	// vertex and feed the inputs to this channel.
 	flowIDs[startID] = struct{}{}
-	inputChannels[startID] = make(chan FlowResult, len(input))
-	for _, i := range input {
+	inputChannels[startID] = make(chan FlowResult, len(inputs))
+	for _, i := range inputs {
 		inputChannels[startID] <- i
 	}
 
@@ -931,10 +946,13 @@ func (d *DAG) DescendantsFlow(startID string, input []FlowResult, f FlowCallback
 	// inputs and outputs) in a separate goroutine.
 	for id := range flowIDs {
 
-		// Get all children of this vertex that later need to be notified. Note, children
-		// are before the goroutine to be able to release the read lock as
-		// early as possible.
-		children, _ := d.GetChildren(id)
+		// Get all children of this vertex that later need to be notified. Note, we
+		// collect all children before the goroutine to be able to release the read
+		// lock as early as possible.
+		children, errChildren := d.GetChildren(id)
+		if errChildren != nil {
+			return []FlowResult{}, errChildren
+		}
 
 		// Remember to wait for this goroutine.
 		wg.Add(1)
@@ -953,20 +971,23 @@ func (d *DAG) DescendantsFlow(startID string, input []FlowResult, f FlowCallback
 			}
 
 			// Execute the worker.
-			r := f(d, id, parentResults)
-			fr := FlowResult{
+			result, errWorker := callback(d, id, parentResults)
+
+			// Wrap the worker's result into a FlowResult.
+			flowResult := FlowResult{
 				ID:     id,
-				Result: r,
+				Result: result,
+				Error:  errWorker,
 			}
 
-			// Send this worker's result onto all children's input channels or, if it is a
-			// leaf (i.e. no children), send the result onto the output channel.
+			// Send this worker's FlowResult onto all children's input channels or, if it is
+			// a leaf (i.e. no children), send the result onto the output channel.
 			if len(children) > 0 {
 				for child := range children {
-					inputChannels[child] <- fr
+					inputChannels[child] <- flowResult
 				}
 			} else {
-				outputChannel <- fr
+				outputChannel <- flowResult
 			}
 
 			// "Sign off".
@@ -978,7 +999,7 @@ func (d *DAG) DescendantsFlow(startID string, input []FlowResult, f FlowCallback
 	// Wait for all go routines to finish.
 	wg.Wait()
 
-	// Await all parent inputs and stuff them into a slice.
+	// Await all leaf vertex results and stuff them into a slice.
 	resultCount := cap(outputChannel)
 	results := make([]FlowResult, resultCount)
 	for i := 0; i < resultCount; i++ {
