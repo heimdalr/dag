@@ -891,9 +891,10 @@ type FlowResult struct {
 // should return a result or an error.
 type FlowCallback func(d *DAG, id string, parentResults []FlowResult) (interface{}, error)
 
-// DescendantsFlow traverses descendants of the given start vertex (startID). For
-// each descendant it executes the given (callback-) function (FlowCallback), if all parents
-// have finished their work. The
+// DescendantsFlow traverses descendants of the vertex with the ID startID. For
+// the vertex itself and each of its descendant it executes the given (callback-)
+// function providing it the results of its respective parents. The (callback-)
+// function is only executed after all parents have finished their work.
 func (d *DAG) DescendantsFlow(startID string, inputs []FlowResult, callback FlowCallback) ([]FlowResult, error) {
 	d.muDAG.RLock()
 	defer d.muDAG.RUnlock()
