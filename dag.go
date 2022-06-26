@@ -366,6 +366,26 @@ func (d *DAG) getLeaves() map[string]interface{} {
 	return leaves
 }
 
+// IsLeaf returns true, if the vertex with the given id has no children. IsLeaf
+// returns an error, if id is empty or unknown.
+func (d *DAG) IsLeaf(id string) (bool, error) {
+	d.muDAG.RLock()
+	defer d.muDAG.RUnlock()
+	if err := d.saneID(id); err != nil {
+		return false, err
+	}
+	return d.isLeaf(id), nil
+}
+
+func (d *DAG) isLeaf(id string) bool {
+	v := d.vertexIds[id]
+	dstIDs, ok := d.outboundEdge[v]
+	if !ok || len(dstIDs) == 0 {
+		return true
+	}
+	return false
+}
+
 // GetRoots returns all vertices without parents.
 func (d *DAG) GetRoots() map[string]interface{} {
 	d.muDAG.RLock()
@@ -383,6 +403,26 @@ func (d *DAG) getRoots() map[string]interface{} {
 		}
 	}
 	return roots
+}
+
+// IsRoot returns true, if the vertex with the given id has no parents. IsRoot
+// returns an error, if id is empty or unknown.
+func (d *DAG) IsRoot(id string) (bool, error) {
+	d.muDAG.RLock()
+	defer d.muDAG.RUnlock()
+	if err := d.saneID(id); err != nil {
+		return false, err
+	}
+	return d.isRoot(id), nil
+}
+
+func (d *DAG) isRoot(id string) bool {
+	v := d.vertexIds[id]
+	srcIDs, ok := d.inboundEdge[v]
+	if !ok || len(srcIDs) == 0 {
+		return true
+	}
+	return false
 }
 
 // GetVertices returns all vertices.
@@ -827,6 +867,146 @@ func (d *DAG) walkDescendants(v interface{}, ids chan string, signal chan bool) 
 			ids <- d.vertices[top]
 		}
 	}
+}
+
+// FlowResult describes the data to be passed between vertices in a DescendantsFlow.
+type FlowResult struct {
+
+	// The id of the vertex that produced this result.
+	ID string
+
+	// The actual result.
+	Result interface{}
+
+	// Any error. Note, DescendantsFlow does not care about this error. It is up to
+	// the FlowCallback of downstream vertices to handle the error as needed - if
+	// needed.
+	Error error
+}
+
+// FlowCallback is the signature of the (callback-) function to call for each
+// vertex within a DescendantsFlow, after all its parents have finished their
+// work. The parameters of the function are the (complete) DAG, the current
+// vertex ID, and the results of all its parents. An instance of FlowCallback
+// should return a result or an error.
+type FlowCallback func(d *DAG, id string, parentResults []FlowResult) (interface{}, error)
+
+// DescendantsFlow traverses descendants of the given start vertex (startID). For
+// each descendant it executes the given (callback-) function (FlowCallback), if all parents
+// have finished their work. The
+func (d *DAG) DescendantsFlow(startID string, inputs []FlowResult, callback FlowCallback) ([]FlowResult, error) {
+	d.muDAG.RLock()
+	defer d.muDAG.RUnlock()
+
+	// Get IDs of all descendant vertices.
+	flowIDs, errDes := d.GetDescendants(startID)
+	if errDes != nil {
+		return []FlowResult{}, errDes
+	}
+
+	// inputChannels provides for input channels for each of the descendant vertices (+ the start-vertex).
+	inputChannels := make(map[string]chan FlowResult, len(flowIDs)+1)
+
+	// Iterate vertex IDs and create an input channel for each of them and a single
+	// output channel for leaves. Note, this "pre-flight" is needed to ensure we
+	// really have an input channel regardless of how we traverse the tree and spawn
+	// workers.
+	leafCount := 0
+	for id := range flowIDs {
+
+		// Get all parents of this vertex.
+		parents, errPar := d.GetParents(id)
+		if errPar != nil {
+			return []FlowResult{}, errPar
+		}
+
+		// Create a buffered input channel that has capacity for all parent results.
+		inputChannels[id] = make(chan FlowResult, len(parents))
+
+		if d.isLeaf(id) {
+			leafCount += 1
+		}
+	}
+
+	// outputChannel caries the results of leaf vertices.
+	outputChannel := make(chan FlowResult, leafCount)
+
+	// To also process the start vertex and to have its results being passed to its
+	// children, add it to the vertex IDs. Also add an input channel for the start
+	// vertex and feed the inputs to this channel.
+	flowIDs[startID] = struct{}{}
+	inputChannels[startID] = make(chan FlowResult, len(inputs))
+	for _, i := range inputs {
+		inputChannels[startID] <- i
+	}
+
+	wg := sync.WaitGroup{}
+
+	// Iterate all vertex IDs (now incl. start vertex) and handle each worker (incl.
+	// inputs and outputs) in a separate goroutine.
+	for id := range flowIDs {
+
+		// Get all children of this vertex that later need to be notified. Note, we
+		// collect all children before the goroutine to be able to release the read
+		// lock as early as possible.
+		children, errChildren := d.GetChildren(id)
+		if errChildren != nil {
+			return []FlowResult{}, errChildren
+		}
+
+		// Remember to wait for this goroutine.
+		wg.Add(1)
+
+		go func(id string) {
+
+			// Get this vertex's input channel.
+			// Note, only concurrent read here, which is fine.
+			c := inputChannels[id]
+
+			// Await all parent inputs and stuff them into a slice.
+			parentCount := cap(c)
+			parentResults := make([]FlowResult, parentCount)
+			for i := 0; i < parentCount; i++ {
+				parentResults[i] = <-c
+			}
+
+			// Execute the worker.
+			result, errWorker := callback(d, id, parentResults)
+
+			// Wrap the worker's result into a FlowResult.
+			flowResult := FlowResult{
+				ID:     id,
+				Result: result,
+				Error:  errWorker,
+			}
+
+			// Send this worker's FlowResult onto all children's input channels or, if it is
+			// a leaf (i.e. no children), send the result onto the output channel.
+			if len(children) > 0 {
+				for child := range children {
+					inputChannels[child] <- flowResult
+				}
+			} else {
+				outputChannel <- flowResult
+			}
+
+			// "Sign off".
+			wg.Done()
+
+		}(id)
+	}
+
+	// Wait for all go routines to finish.
+	wg.Wait()
+
+	// Await all leaf vertex results and stuff them into a slice.
+	resultCount := cap(outputChannel)
+	results := make([]FlowResult, resultCount)
+	for i := 0; i < resultCount; i++ {
+		results[i] = <-outputChannel
+	}
+
+	return results, nil
 }
 
 // ReduceTransitively transitively reduce the graph.
