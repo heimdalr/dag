@@ -4,8 +4,9 @@
 [![PkgGoDev](https://pkg.go.dev/badge/github.com/heimdalr/dag)](https://pkg.go.dev/github.com/heimdalr/dag)
 [![Go Report Card](https://goreportcard.com/badge/github.com/heimdalr/dag)](https://goreportcard.com/report/github.com/heimdalr/dag)
 [![Gitpod ready-to-code](https://img.shields.io/badge/Gitpod-ready--to--code-blue?logo=gitpod)](https://gitpod.io/#https://github.com/heimdalr/dag)
-<!--[![Scorecards supply-chain security](https://github.com/heimdalr/dag/actions/workflows/scorecards.yml/badge.svg)](https://github.com/heimdalr/dag/actions/workflows/scorecards.yml)-->
 [![CodeQL](https://github.com/heimdalr/dag/actions/workflows/codeql-analysis.yml/badge.svg)](https://github.com/heimdalr/dag/actions/workflows/codeql-analysis.yml)
+<!--[![Scorecards supply-chain security](https://github.com/heimdalr/dag/actions/workflows/scorecards.yml/badge.svg)](https://github.com/heimdalr/dag/actions/workflows/scorecards.yml)-->
+
 
 
 Implementation of directed acyclic graphs (DAGs).
