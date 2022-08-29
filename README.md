@@ -6,7 +6,7 @@
 [![Gitpod ready-to-code](https://img.shields.io/badge/Gitpod-ready--to--code-blue?logo=gitpod)](https://gitpod.io/#https://github.com/heimdalr/dag)
 [![CodeQL](https://github.com/heimdalr/dag/actions/workflows/codeql-analysis.yml/badge.svg)](https://github.com/heimdalr/dag/actions/workflows/codeql-analysis.yml)
 <!--[![Scorecards supply-chain security](https://github.com/heimdalr/dag/actions/workflows/scorecards.yml/badge.svg)](https://github.com/heimdalr/dag/actions/workflows/scorecards.yml)-->
-
+[![CII Best Practices](https://bestpractices.coreinfrastructure.org/projects/6402/badge)](https://bestpractices.coreinfrastructure.org/projects/6402)
 
 
 Implementation of directed acyclic graphs (DAGs).
