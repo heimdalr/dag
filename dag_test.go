@@ -3,6 +3,7 @@ package dag
 import (
 	"fmt"
 	"github.com/go-test/deep"
+	"sort"
 	"strconv"
 	"testing"
 )
@@ -1299,6 +1300,35 @@ func TestLarge(t *testing.T) {
 		}
 		_ = d.DeleteEdge(root, childList[0])
 	*/
+}
+
+func TestDAG_DescendantsFlowOneNode(t *testing.T) {
+	// Initialize a new graph.
+	d := NewDAG()
+
+	// Init vertices.
+	v0, _ := d.AddVertex(0)
+
+	// The callback function adds its own value (ID) to the sum of parent results.
+	flowCallback := func(d *DAG, id string, parentResults []FlowResult) (interface{}, error) {
+
+		v, _ := d.GetVertex(id)
+		result, _ := v.(int)
+		var parents []int
+		for _, r := range parentResults {
+			p, _ := d.GetVertex(r.ID)
+			parents = append(parents, p.(int))
+			result += r.Result.(int)
+		}
+		sort.Ints(parents)
+		fmt.Printf("%v based on: %+v returns: %d\n", v, parents, result)
+		return result, nil
+	}
+
+	res, _ := d.DescendantsFlow(v0, nil, flowCallback)
+	if len(res) != 1 {
+		t.Errorf("DescendantsFlow() = %d, want 1", len(res))
+	}
 }
 
 func largeAux(d *DAG, level int, branches int, parent iVertex) (int, int) {

@@ -57,33 +57,3 @@ func ExampleDAG_DescendantsFlow() {
 	// 2 based on: [1] returns: 3
 	// 4 based on: [2 3] returns: 10
 }
-
-func ExampleDAG_DescendantsFlowOneNode() {
-	// Initialize a new graph.
-	d := dag.NewDAG()
-
-	// Init vertices.
-	v0, _ := d.AddVertex(0)
-	// The callback function adds its own value (ID) to the sum of parent results.
-	flowCallback := func(d *dag.DAG, id string, parentResults []dag.FlowResult) (interface{}, error) {
-
-		v, _ := d.GetVertex(id)
-		result, _ := v.(int)
-		var parents []int
-		for _, r := range parentResults {
-			p, _ := d.GetVertex(r.ID)
-			parents = append(parents, p.(int))
-			result += r.Result.(int)
-		}
-		sort.Ints(parents)
-		fmt.Printf("%v based on: %+v returns: %d\n", v, parents, result)
-		return result, nil
-	}
-
-	res, _ := d.DescendantsFlow(v0, nil, flowCallback)
-	fmt.Printf("can output len: %d", len(res))
-
-	// output:
-	// 0 based on: [] returns: 0
-	// can output len: 1
-}
