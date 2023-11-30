@@ -105,3 +105,53 @@ func reversedVertexIDs(vertices map[string]interface{}) []string {
 	}
 	return ids
 }
+
+// OrderedWalk implements the Topological Sort algorithm to traverse the entire DAG.
+// This means that for any edge a -> b, node a will be visited before node b.
+func (d *DAG) OrderedWalk(visitor Visitor) {
+
+	d.muDAG.RLock()
+	defer d.muDAG.RUnlock()
+
+	queue := llq.New()
+	vertices := d.getRoots()
+	for _, id := range vertexIDs(vertices) {
+		v := vertices[id]
+		sv := storableVertex{WrappedID: id, Value: v}
+		queue.Enqueue(sv)
+	}
+
+	visited := make(map[string]bool, d.getOrder())
+
+Main:
+	for !queue.Empty() {
+		v, _ := queue.Dequeue()
+		sv := v.(storableVertex)
+
+		if visited[sv.WrappedID] {
+			continue
+		}
+
+		// if the current vertex has any parent that hasn't been visited yet,
+		// put it back into the queue, and work on the next element
+		parents, _ := d.GetParents(sv.WrappedID)
+		for parent := range parents {
+			if !visited[parent] {
+				queue.Enqueue(sv)
+				continue Main
+			}
+		}
+
+		if !visited[sv.WrappedID] {
+			visited[sv.WrappedID] = true
+			visitor.Visit(sv)
+		}
+
+		vertices, _ := d.getChildren(sv.WrappedID)
+		for _, id := range vertexIDs(vertices) {
+			v := vertices[id]
+			sv := storableVertex{WrappedID: id, Value: v}
+			queue.Enqueue(sv)
+		}
+	}
+}
