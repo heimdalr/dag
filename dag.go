@@ -1313,3 +1313,7 @@ func (d *dMutex) unlock(i interface{}) {
 	// release the global lock
 	d.globalMutex.Unlock()
 }
+
+func (d *DAG) GetOutboundEdges() map[interface{}]map[interface{}]struct{} {
+	return d.outboundEdge
+}
