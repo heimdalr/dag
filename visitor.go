@@ -25,7 +25,7 @@ func (d *DAG) DFSWalk(visitor Visitor) {
 
 	vertices := d.getRoots()
 	for _, id := range reversedVertexIDs(vertices) {
-		v := vertices[id]
+		v := d.vertexIds[id]
 		sv := storableVertex{WrappedID: id, Value: v}
 		stack.Push(sv)
 	}
@@ -43,7 +43,7 @@ func (d *DAG) DFSWalk(visitor Visitor) {
 
 		vertices, _ := d.getChildren(sv.WrappedID)
 		for _, id := range reversedVertexIDs(vertices) {
-			v := vertices[id]
+			v := d.vertexIds[id]
 			sv := storableVertex{WrappedID: id, Value: v}
 			stack.Push(sv)
 		}
