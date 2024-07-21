@@ -28,6 +28,7 @@ type DAG struct {
 	verticesLocked   *dMutex
 	ancestorsCache   map[interface{}]map[interface{}]struct{}
 	descendantsCache map[interface{}]map[interface{}]struct{}
+	options          Options
 }
 
 // NewDAG creates / initializes a new DAG.
@@ -40,6 +41,7 @@ func NewDAG() *DAG {
 		verticesLocked:   newDMutex(),
 		ancestorsCache:   make(map[interface{}]map[interface{}]struct{}),
 		descendantsCache: make(map[interface{}]map[interface{}]struct{}),
+		options:          defaultOptions(),
 	}
 }
 
