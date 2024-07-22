@@ -53,7 +53,7 @@ func testMarshalUnmarshalJSON(t *testing.T, d *DAG, expected string) {
 	}
 
 	var wd testStorableDAG
-	dag, err := UnmarshalJSON(data, &wd)
+	dag, err := UnmarshalJSON(data, &wd, defaultOptions())
 	if err != nil {
 		t.Fatal(err)
 	}

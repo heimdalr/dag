@@ -42,12 +42,13 @@ func (d *DAG) UnmarshalJSON(_ []byte) error {
 // }
 //
 // For more specific information please read the test code.
-func UnmarshalJSON(data []byte, wd StorableDAG) (*DAG, error) {
+func UnmarshalJSON(data []byte, wd StorableDAG, options Options) (*DAG, error) {
 	err := json.Unmarshal(data, &wd)
 	if err != nil {
 		return nil, err
 	}
 	dag := NewDAG()
+	dag.Options(options)
 	for _, v := range wd.Vertices() {
 		errVertex := dag.AddVertexByID(v.Vertex())
 		if errVertex != nil {
