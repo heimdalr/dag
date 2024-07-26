@@ -9,3 +9,5 @@ require (
 	github.com/go-test/deep v1.1.0
 	github.com/google/uuid v1.3.0
 )
+
+retract [v1.4.1, v1.4.11]
