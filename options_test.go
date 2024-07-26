@@ -182,7 +182,7 @@ func TestOverrideVertexHashFunOption(t *testing.T) {
 
 	dag.ReduceTransitively()
 	dag.FlushCaches()
-	dag.DescendantsWalker(vertexId1)
+	dag.DescendantsWalker(vertexId1) // nolint:errcheck
 
 	mv := newMarshalVisitor(dag)
 	dag.DFSWalk(mv)
