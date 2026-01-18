@@ -17,68 +17,14 @@ type IDInterface interface {
 	ID() string
 }
 
-// Vertex is the interface that describes a vertex in the DAG.
-type Vertex interface {
-	ID() string
-	Value() interface{}
-}
-
-// vertex implements the Vertex interface.
-type vertex struct {
-	id  string
-	val interface{}
-}
-
-func (v *vertex) ID() string {
-	return v.id
-}
-
-func (v *vertex) Value() interface{} {
-	return v.val
-}
-
-// vertexMap handles the storage of vertices.
-type vertexMap struct {
-	// byHash maps vertex hash to vertex id.
-	byHash map[interface{}]string
-	// byID maps vertex id to Vertex.
-	byID map[string]Vertex
-}
-
-func newVertexMap() *vertexMap {
-	return &vertexMap{
-		byHash: make(map[interface{}]string),
-		byID:   make(map[string]Vertex),
-	}
-}
-
-func (vm *vertexMap) get(id string) (Vertex, bool) {
-	v, ok := vm.byID[id]
-	return v, ok
-}
-
-func (vm *vertexMap) add(v Vertex, hash interface{}) {
-	vm.byID[v.ID()] = v
-	vm.byHash[hash] = v.ID()
-}
-
-func (vm *vertexMap) delete(id string, hash interface{}) {
-	delete(vm.byID, id)
-	delete(vm.byHash, hash)
-}
-
-func (vm *vertexMap) count() int {
-	return len(vm.byID)
-}
-
 // DAG implements the data structure of the DAG.
+// It manages graph topology; vertex data is owned by vertexStore.
 type DAG struct {
 	muDAG            sync.RWMutex
-	vertices         *vertexMap
+	vertexStore      *vertexStore
 	inboundEdge      map[interface{}]map[interface{}]struct{}
 	outboundEdge     map[interface{}]map[interface{}]struct{}
 	muCache          sync.RWMutex
-	verticesLocked   *dMutex
 	ancestorsCache   map[interface{}]map[interface{}]struct{}
 	descendantsCache map[interface{}]map[interface{}]struct{}
 	options          Options
@@ -86,14 +32,14 @@ type DAG struct {
 
 // NewDAG creates / initializes a new DAG.
 func NewDAG() *DAG {
+	options := defaultOptions()
 	return &DAG{
-		vertices:         newVertexMap(),
+		vertexStore:      newVertexStore(options.VertexHashFunc),
 		inboundEdge:      make(map[interface{}]map[interface{}]struct{}),
 		outboundEdge:     make(map[interface{}]map[interface{}]struct{}),
-		verticesLocked:   newDMutex(),
 		ancestorsCache:   make(map[interface{}]map[interface{}]struct{}),
 		descendantsCache: make(map[interface{}]map[interface{}]struct{}),
-		options:          defaultOptions(),
+		options:          options,
 	}
 }
 
@@ -133,24 +79,7 @@ func (d *DAG) AddVertexByID(id string, v interface{}) error {
 }
 
 func (d *DAG) addVertexByID(id string, v interface{}) error {
-	vHash := d.hashVertex(v)
-
-	// sanity checking
-	if v == nil {
-		return VertexNilError{}
-	}
-	if _, exists := d.vertices.byHash[vHash]; exists {
-		return VertexDuplicateError{v}
-	}
-
-	if _, exists := d.vertices.byID[id]; exists {
-		return IDDuplicateError{id}
-	}
-
-	newVertex := &vertex{id: id, val: v}
-	d.vertices.add(newVertex, vHash)
-
-	return nil
+	return d.vertexStore.add(id, v)
 }
 
 // GetVertex returns a vertex by its id. GetVertex returns an error, if id is
@@ -163,11 +92,11 @@ func (d *DAG) GetVertex(id string) (interface{}, error) {
 		return nil, IDEmptyError{}
 	}
 
-	v, exists := d.vertices.get(id)
+	v, exists := d.vertexStore.value(id)
 	if !exists {
 		return nil, IDUnknownError{id}
 	}
-	return v.Value(), nil
+	return v, nil
 }
 
 // DeleteVertex deletes the vertex with the given id. DeleteVertex also
@@ -182,8 +111,7 @@ func (d *DAG) DeleteVertex(id string) error {
 		return err
 	}
 
-	v, _ := d.vertices.get(id)
-	vHash := d.hashVertex(v.Value())
+	vHash, _ := d.vertexStore.hashByID(id)
 
 	// get descendents and ancestors as they are now
 	descendants := copyMap(d.getDescendants(vHash))
@@ -220,7 +148,7 @@ func (d *DAG) DeleteVertex(id string) error {
 	delete(d.descendantsCache, vHash)
 
 	// delete v itself
-	d.vertices.delete(id, vHash)
+	d.vertexStore.delete(id, vHash)
 
 	return nil
 }
@@ -245,10 +173,8 @@ func (d *DAG) AddEdge(srcID, dstID string) error {
 		return SrcDstEqualError{srcID, dstID}
 	}
 
-	src, _ := d.vertices.get(srcID)
-	srcHash := d.hashVertex(src.Value())
-	dst, _ := d.vertices.get(dstID)
-	dstHash := d.hashVertex(dst.Value())
+	srcHash, _ := d.vertexStore.hashByID(srcID)
+	dstHash, _ := d.vertexStore.hashByID(dstID)
 
 	// if the edge is already known, there is nothing else to do
 	if d.isEdge(srcHash, dstHash) {
@@ -311,9 +237,9 @@ func (d *DAG) IsEdge(srcID, dstID string) (bool, error) {
 		return false, SrcDstEqualError{srcID, dstID}
 	}
 
-	src, _ := d.vertices.get(srcID)
-	dst, _ := d.vertices.get(dstID)
-	return d.isEdge(d.hashVertex(src.Value()), d.hashVertex(dst.Value())), nil
+	srcHash, _ := d.vertexStore.hashByID(srcID)
+	dstHash, _ := d.vertexStore.hashByID(dstID)
+	return d.isEdge(srcHash, dstHash), nil
 }
 
 func (d *DAG) isEdge(srcHash, dstHash interface{}) bool {
@@ -351,10 +277,8 @@ func (d *DAG) DeleteEdge(srcID, dstID string) error {
 		return SrcDstEqualError{srcID, dstID}
 	}
 
-	src, _ := d.vertices.get(srcID)
-	srcHash := d.hashVertex(src.Value())
-	dst, _ := d.vertices.get(dstID)
-	dstHash := d.hashVertex(dst.Value())
+	srcHash, _ := d.vertexStore.hashByID(srcID)
+	dstHash, _ := d.vertexStore.hashByID(dstID)
 
 	if !d.isEdge(srcHash, dstHash) {
 		return EdgeUnknownError{srcID, dstID}
@@ -391,7 +315,7 @@ func (d *DAG) GetOrder() int {
 }
 
 func (d *DAG) getOrder() int {
-	return d.vertices.count()
+	return d.vertexStore.count()
 }
 
 // GetSize returns the number of edges in the graph.
@@ -418,13 +342,12 @@ func (d *DAG) GetLeaves() map[string]interface{} {
 
 func (d *DAG) getLeaves() map[string]interface{} {
 	leaves := make(map[string]interface{})
-	for vHash, id := range d.vertices.byHash {
+	d.vertexStore.eachByHash(func(vHash interface{}, id string, value interface{}) {
 		dstIDs, ok := d.outboundEdge[vHash]
 		if !ok || len(dstIDs) == 0 {
-			v, _ := d.vertices.get(id)
-			leaves[id] = v.Value()
+			leaves[id] = value
 		}
-	}
+	})
 	return leaves
 }
 
@@ -440,8 +363,7 @@ func (d *DAG) IsLeaf(id string) (bool, error) {
 }
 
 func (d *DAG) isLeaf(id string) bool {
-	v, _ := d.vertices.get(id)
-	vHash := d.hashVertex(v.Value())
+	vHash, _ := d.vertexStore.hashByID(id)
 	dstIDs, ok := d.outboundEdge[vHash]
 	if !ok || len(dstIDs) == 0 {
 		return true
@@ -458,13 +380,12 @@ func (d *DAG) GetRoots() map[string]interface{} {
 
 func (d *DAG) getRoots() map[string]interface{} {
 	roots := make(map[string]interface{})
-	for vHash, id := range d.vertices.byHash {
+	d.vertexStore.eachByHash(func(vHash interface{}, id string, value interface{}) {
 		srcIDs, ok := d.inboundEdge[vHash]
 		if !ok || len(srcIDs) == 0 {
-			v, _ := d.vertices.get(id)
-			roots[id] = v.Value()
+			roots[id] = value
 		}
-	}
+	})
 	return roots
 }
 
@@ -480,8 +401,7 @@ func (d *DAG) IsRoot(id string) (bool, error) {
 }
 
 func (d *DAG) isRoot(id string) bool {
-	v, _ := d.vertices.get(id)
-	vHash := d.hashVertex(v.Value())
+	vHash, _ := d.vertexStore.hashByID(id)
 	srcIDs, ok := d.inboundEdge[vHash]
 	if !ok || len(srcIDs) == 0 {
 		return true
@@ -493,11 +413,7 @@ func (d *DAG) isRoot(id string) bool {
 func (d *DAG) GetVertices() map[string]interface{} {
 	d.muDAG.RLock()
 	defer d.muDAG.RUnlock()
-	out := make(map[string]interface{})
-	for id, value := range d.vertices.byID {
-		out[id] = value.Value()
-	}
-	return out
+	return d.vertexStore.values()
 }
 
 // GetParents returns the all parents of the vertex with the id
@@ -508,12 +424,12 @@ func (d *DAG) GetParents(id string) (map[string]interface{}, error) {
 	if err := d.saneID(id); err != nil {
 		return nil, err
 	}
-	v, _ := d.vertices.get(id)
-	vHash := d.hashVertex(v.Value())
+	vHash, _ := d.vertexStore.hashByID(id)
 	parents := make(map[string]interface{})
 	for pv := range d.inboundEdge[vHash] {
-		pid := d.vertices.byHash[pv]
-		parents[pid] = pv
+		if pid, ok := d.vertexStore.idByHash(pv); ok {
+			parents[pid] = pv
+		}
 	}
 	return parents, nil
 }
@@ -530,12 +446,12 @@ func (d *DAG) getChildren(id string) (map[string]interface{}, error) {
 	if err := d.saneID(id); err != nil {
 		return nil, err
 	}
-	v, _ := d.vertices.get(id)
-	vHash := d.hashVertex(v.Value())
+	vHash, _ := d.vertexStore.hashByID(id)
 	children := make(map[string]interface{})
 	for cv := range d.outboundEdge[vHash] {
-		cid := d.vertices.byHash[cv]
-		children[cid] = cv
+		if cid, ok := d.vertexStore.idByHash(cv); ok {
+			children[cid] = cv
+		}
 	}
 	return children, nil
 }
@@ -552,12 +468,12 @@ func (d *DAG) GetAncestors(id string) (map[string]interface{}, error) {
 	if err := d.saneID(id); err != nil {
 		return nil, err
 	}
-	v, _ := d.vertices.get(id)
-	vHash := d.hashVertex(v.Value())
+	vHash, _ := d.vertexStore.hashByID(id)
 	ancestors := make(map[string]interface{})
 	for av := range d.getAncestors(vHash) {
-		aid := d.vertices.byHash[av]
-		ancestors[aid] = av
+		if aid, ok := d.vertexStore.idByHash(av); ok {
+			ancestors[aid] = av
+		}
 	}
 	return ancestors, nil
 }
@@ -573,8 +489,8 @@ func (d *DAG) getAncestors(vHash interface{}) map[interface{}]struct{} {
 	}
 
 	// lock this vertex to work on it exclusively
-	d.verticesLocked.lock(vHash)
-	defer d.verticesLocked.unlock(vHash)
+	d.vertexStore.lock(vHash)
+	defer d.vertexStore.unlock(vHash)
 
 	// now as we have locked this vertex, check (again) that no one has
 	// meanwhile populated the cache
@@ -647,8 +563,7 @@ func (d *DAG) AncestorsWalker(id string) (chan string, chan bool, error) {
 	signal := make(chan bool, 1)
 	go func() {
 		d.muDAG.RLock()
-		v, _ := d.vertices.get(id)
-		vHash := d.hashVertex(v.Value())
+		vHash, _ := d.vertexStore.hashByID(id)
 		d.walkAncestors(vHash, ids, signal)
 		d.muDAG.RUnlock()
 		close(ids)
@@ -681,7 +596,9 @@ func (d *DAG) walkAncestors(vHash interface{}, ids chan string, signal chan bool
 		case <-signal:
 			return
 		default:
-			ids <- d.vertices.byHash[top]
+			if id, ok := d.vertexStore.idByHash(top); ok {
+				ids <- id
+			}
 		}
 	}
 }
@@ -700,13 +617,13 @@ func (d *DAG) GetDescendants(id string) (map[string]interface{}, error) {
 	if err := d.saneID(id); err != nil {
 		return nil, err
 	}
-	v, _ := d.vertices.get(id)
-	vHash := d.hashVertex(v.Value())
+	vHash, _ := d.vertexStore.hashByID(id)
 
 	descendants := make(map[string]interface{})
 	for dv := range d.getDescendants(vHash) {
-		did := d.vertices.byHash[dv]
-		descendants[did] = dv
+		if did, ok := d.vertexStore.idByHash(dv); ok {
+			descendants[did] = dv
+		}
 	}
 	return descendants, nil
 }
@@ -722,8 +639,8 @@ func (d *DAG) getDescendants(vHash interface{}) map[interface{}]struct{} {
 	}
 
 	// lock this vertex to work on it exclusively
-	d.verticesLocked.lock(vHash)
-	defer d.verticesLocked.unlock(vHash)
+	d.vertexStore.lock(vHash)
+	defer d.vertexStore.unlock(vHash)
 
 	// now as we have locked this vertex, check (again) that no one has
 	// meanwhile populated the cache
@@ -817,11 +734,10 @@ func (d *DAG) getRelativesGraph(id string, asc bool) (*DAG, string, error) {
 	if id == "" {
 		return nil, "", IDEmptyError{}
 	}
-	v, exists := d.vertices.get(id)
-	if !exists {
+	if !d.vertexStore.hasID(id) {
 		return nil, "", IDUnknownError{id}
 	}
-	vHash := d.hashVertex(v.Value())
+	vHash, _ := d.vertexStore.hashByID(id)
 
 	// create a new dag
 	newDAG := NewDAG()
@@ -838,25 +754,6 @@ func (d *DAG) getRelativesGraph(id string, asc bool) (*DAG, string, error) {
 func (d *DAG) getRelativesGraphRec(vHash interface{}, newDAG *DAG, visited map[interface{}]string, asc bool) (newId string, err error) {
 
 	// copy this vertex to the new graph
-	// Note: We need to get the original vertex value from the hash to add it to the new DAG.
-	// But d.vertices.byHash gives ID, then ID gives Vertex.
-	// In the original code: newDAG.AddVertex(vHash). But vHash is the hash, not the vertex.
-	// Wait, the original code said `newDAG.AddVertex(vHash)`.
-	// Let's check the original code again.
-	// Line 790: `if newId, err = newDAG.AddVertex(vHash); err != nil {`
-	// Wait, `vHash` is `interface{}`. The original code added the HASH itself as a vertex?
-	// `vHash` is `d.hashVertex(v)`.
-	// If `vHash` is added as a vertex, then the new DAG contains hashes as vertices, not the original objects?
-	// Let's check `getRelativesGraphRec` in original code.
-	// Yes, `vHash` is passed.
-	// This seems like the original behavior was to create a graph where vertices are the hashes of the original vertices?
-	// Or maybe `vHash` IS the vertex object if the hash function is Identity?
-	// Default hash function is Identity?
-	// Let's check `defaultOptions`. It's not visible here but usually it is.
-	// If `VertexHashFunc` returns the vertex itself (identity), then `vHash` is the vertex.
-	// If it returns a string or int, then the new DAG contains strings or ints.
-	// I should preserve this behavior: `newDAG.AddVertex(vHash)`.
-
 	if newId, err = newDAG.AddVertex(vHash); err != nil {
 		return
 	}
@@ -920,8 +817,7 @@ func (d *DAG) DescendantsWalker(id string) (chan string, chan bool, error) {
 	signal := make(chan bool, 1)
 	go func() {
 		d.muDAG.RLock()
-		v, _ := d.vertices.get(id)
-		vHash := d.hashVertex(v.Value())
+		vHash, _ := d.vertexStore.hashByID(id)
 		d.walkDescendants(vHash, ids, signal)
 		d.muDAG.RUnlock()
 		close(ids)
@@ -953,7 +849,9 @@ func (d *DAG) walkDescendants(vHash interface{}, ids chan string, signal chan bo
 		case <-signal:
 			return
 		default:
-			ids <- d.vertices.byHash[top]
+			if id, ok := d.vertexStore.idByHash(top); ok {
+				ids <- id
+			}
 		}
 	}
 }
@@ -1120,7 +1018,7 @@ func (d *DAG) ReduceTransitively() {
 	}
 
 	// for each vertex
-	for vHash := range d.vertices.byHash {
+	d.vertexStore.eachByHash(func(vHash interface{}, _ string, _ interface{}) {
 
 		// map of descendants of the children of v
 		descendentsOfChildrenOfV := make(map[interface{}]struct{})
@@ -1145,7 +1043,7 @@ func (d *DAG) ReduceTransitively() {
 				graphChanged = true
 			}
 		}
-	}
+	})
 
 	// flush the descendants- and ancestor cache if the graph has changed
 	if graphChanged {
@@ -1207,9 +1105,9 @@ func (d *DAG) String() string {
 	result := fmt.Sprintf("DAG Vertices: %d - Edges: %d\n", d.GetOrder(), d.GetSize())
 	result += "Vertices:\n"
 	d.muDAG.RLock()
-	for k := range d.vertices.byHash {
-		result += fmt.Sprintf("  %v\n", k)
-	}
+	d.vertexStore.eachByHash(func(vHash interface{}, _ string, _ interface{}) {
+		result += fmt.Sprintf("  %v\n", vHash)
+	})
 	result += "Edges:\n"
 	for v, children := range d.outboundEdge {
 		for child := range children {
@@ -1225,15 +1123,17 @@ func (d *DAG) saneID(id string) error {
 	if id == "" {
 		return IDEmptyError{}
 	}
-	_, exists := d.vertices.get(id)
-	if !exists {
+	if !d.vertexStore.hasID(id) {
 		return IDUnknownError{id}
 	}
 	return nil
 }
 
 func (d *DAG) hashVertex(v interface{}) interface{} {
-	return d.options.VertexHashFunc(v)
+	if d.vertexStore == nil {
+		return d.options.VertexHashFunc(v)
+	}
+	return d.vertexStore.hash(v)
 }
 
 func copyMap(in map[interface{}]struct{}) map[interface{}]struct{} {
@@ -1345,75 +1245,4 @@ type SrcDstEqualError struct {
 // Implements the error interface.
 func (e SrcDstEqualError) Error() string {
 	return fmt.Sprintf("src ('%s') and dst ('%s') equal", e.src, e.dst)
-}
-
-/***************************
-********** dMutex **********
-****************************/
-
-type cMutex struct {
-	mutex sync.Mutex
-	count int
-}
-
-// Structure for dynamic mutexes.
-type dMutex struct {
-	mutexes     map[interface{}]*cMutex
-	globalMutex sync.Mutex
-}
-
-// Initialize a new dynamic mutex structure.
-func newDMutex() *dMutex {
-	return &dMutex{
-		mutexes: make(map[interface{}]*cMutex),
-	}
-}
-
-// Get a lock for instance i
-func (d *dMutex) lock(i interface{}) {
-
-	// acquire global lock
-	d.globalMutex.Lock()
-
-	// if there is no cMutex for i, create it
-	if _, ok := d.mutexes[i]; !ok {
-		d.mutexes[i] = new(cMutex)
-	}
-
-	// increase the count in order to show, that we are interested in this
-	// instance mutex (thus now one deletes it)
-	d.mutexes[i].count++
-
-	// remember the mutex for later
-	mutex := &d.mutexes[i].mutex
-
-	// as the cMutex is there, we have increased the count, and we know the
-	// instance mutex, we can release the global lock
-	d.globalMutex.Unlock()
-
-	// and wait on the instance mutex
-	(*mutex).Lock()
-}
-
-// Release the lock for instance i.
-func (d *dMutex) unlock(i interface{}) {
-
-	// acquire global lock
-	d.globalMutex.Lock()
-
-	// unlock instance mutex
-	d.mutexes[i].mutex.Unlock()
-
-	// decrease the count, as we are no longer interested in this instance
-	// mutex
-	d.mutexes[i].count--
-
-	// if we are the last one interested in this instance mutex delete the
-	// cMutex
-	if d.mutexes[i].count == 0 {
-		delete(d.mutexes, i)
-	}
-
-	// release the global lock
-	d.globalMutex.Unlock()
 }

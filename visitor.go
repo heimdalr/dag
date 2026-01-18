@@ -25,7 +25,7 @@ func (d *DAG) DFSWalk(visitor Visitor) {
 
 	vertices := d.getRoots()
 	for _, id := range reversedVertexIDs(vertices) {
-		v := d.vertexIds[id]
+		v, _ := d.vertexStore.value(id)
 		sv := storableVertex{WrappedID: id, Value: v}
 		stack.Push(sv)
 	}
@@ -43,7 +43,7 @@ func (d *DAG) DFSWalk(visitor Visitor) {
 
 		vertices, _ := d.getChildren(sv.WrappedID)
 		for _, id := range reversedVertexIDs(vertices) {
-			v := d.vertexIds[id]
+			v, _ := d.vertexStore.value(id)
 			sv := storableVertex{WrappedID: id, Value: v}
 			stack.Push(sv)
 		}
@@ -61,7 +61,7 @@ func (d *DAG) BFSWalk(visitor Visitor) {
 
 	vertices := d.getRoots()
 	for _, id := range vertexIDs(vertices) {
-		v := vertices[id]
+		v, _ := d.vertexStore.value(id)
 		sv := storableVertex{WrappedID: id, Value: v}
 		queue.Enqueue(sv)
 	}
@@ -79,7 +79,7 @@ func (d *DAG) BFSWalk(visitor Visitor) {
 
 		vertices, _ := d.getChildren(sv.WrappedID)
 		for _, id := range vertexIDs(vertices) {
-			v := vertices[id]
+			v, _ := d.vertexStore.value(id)
 			sv := storableVertex{WrappedID: id, Value: v}
 			queue.Enqueue(sv)
 		}
@@ -116,7 +116,7 @@ func (d *DAG) OrderedWalk(visitor Visitor) {
 	queue := llq.New()
 	vertices := d.getRoots()
 	for _, id := range vertexIDs(vertices) {
-		v := vertices[id]
+		v, _ := d.vertexStore.value(id)
 		sv := storableVertex{WrappedID: id, Value: v}
 		queue.Enqueue(sv)
 	}
@@ -149,7 +149,7 @@ Main:
 
 		vertices, _ := d.getChildren(sv.WrappedID)
 		for _, id := range vertexIDs(vertices) {
-			v := vertices[id]
+			v, _ := d.vertexStore.value(id)
 			sv := storableVertex{WrappedID: id, Value: v}
 			queue.Enqueue(sv)
 		}

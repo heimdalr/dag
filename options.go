@@ -11,9 +11,15 @@ type Options struct {
 // Options sets the options for the DAG.
 // Options must be called before any other method of the DAG is called.
 func (d *DAG) Options(options Options) {
+	if options.VertexHashFunc == nil {
+		options.VertexHashFunc = defaultVertexHashFunc
+	}
 	d.muDAG.Lock()
 	defer d.muDAG.Unlock()
 	d.options = options
+	if d.vertexStore != nil {
+		d.vertexStore.setHashFunc(options.VertexHashFunc)
+	}
 }
 
 func defaultOptions() Options {
