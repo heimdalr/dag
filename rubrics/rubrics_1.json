@@ -1,0 +1,110 @@
+[
+    {
+      "rubric_id": "R01",
+      "rubric_content": "代码定义了一个 Vertex 接口，包含顶点相关的行为方法",
+      "必要性": "Essential",
+      "评估维度": "功能要求（functional requirement）",
+      "验证方式": "静态-模型验证",
+      "显性(Explicit)隐性（Implicit）": "Explicit",
+      "rationale": "题目明确要求定义 Vertex 接口来抽象顶点行为，这是重构的核心要求，通过代码静态分析可以直接验证接口的存在性和定义。"
+    },
+    {
+      "rubric_id": "R02",
+      "rubric_content": "Vertex 接口包含 ID() 方法，用于返回顶点唯一标识",
+      "必要性": "Essential",
+      "评估维度": "功能要求（functional requirement）",
+      "验证方式": "静态-模型验证",
+      "显性(Explicit)隐性（Implicit）": "Explicit",
+      "rationale": "题目要求顶点逻辑抽象到接口中，ID 方法是顶点行为的核心，通过接口定义可以静态验证其存在。"
+    },
+    {
+      "rubric_id": "R03",
+      "rubric_content": "创建了具体的 vertex 结构体实现 Vertex 接口",
+      "必要性": "Essential",
+      "评估维度": "功能要求（functional requirement）",
+      "验证方式": "静态-模型验证",
+      "显性(Explicit)隐性（Implicit）": "Explicit",
+      "rationale": "题目明确要求创建具体的结构体实现接口，这是重构的关键步骤，通过代码结构可以直接验证实现关系。"
+    },
+    {
+      "rubric_id": "R04",
+      "rubric_content": "DAG 结构体移除了顶点相关的字段，只保留图结构相关字段",
+      "必要性": "Essential",
+      "评估维度": "功能要求（functional requirement）",
+      "验证方式": "静态-模型验证",
+      "显性(Explicit)隐性（Implicit）": "Explicit",
+      "rationale": "题目核心要求是职责分离，DAG 只管图结构，通过结构体定义可以静态验证字段的移除。"
+    },
+    {
+      "rubric_id": "R05",
+      "rubric_content": "所有公共 API 方法的签名保持完全不变",
+      "必要性": "Essential",
+      "评估维度": "功能要求（functional requirement）",
+      "验证方式": "静态-模型验证",
+      "显性(Explicit)隐性（Implicit）": "Explicit",
+      "rationale": "题目明确要求外部 API 完全不变，这是兼容性保证，通过方法签名对比可以静态验证。"
+    },
+    {
+      "rubric_id": "R06",
+      "rubric_content": "代码中不存在直接访问顶点结构体字段的地方",
+      "必要性": "Essential",
+      "评估维度": "鲁棒性（robustness）",
+      "验证方式": "静态-模型验证",
+      "显性(Explicit)隐性（Implicit）": "Implicit",
+      "rationale": "职责分离后不应直接访问顶点字段，通过代码分析可以验证封装性是否正确实现。"
+    },
+    {
+      "rubric_id": "R07",
+      "rubric_content": "顶点相关的业务逻辑被封装在 Vertex 接口实现中",
+      "必要性": "Important",
+      "评估维度": "功能要求（functional requirement）",
+      "验证方式": "静态-人工验证",
+      "显性(Explicit)隐性（Implicit）": "Implicit",
+      "rationale": "顶点逻辑封装是重构目标，通过代码审查可以验证逻辑是否正确分离到接口实现中。"
+    },
+    {
+      "rubric_id": "R08",
+      "rubric_content": "DAG 结构体的大小和复杂性显著降低",
+      "必要性": "Important",
+      "评估维度": "风格（style）",
+      "验证方式": "静态-模型验证",
+      "显性(Explicit)隐性（Implicit）": "Implicit",
+      "rationale": "重构目的是简化结构体，通过字段数量对比可以静态验证结构优化效果。"
+    },
+    {
+      "rubric_id": "R09",
+      "rubric_content": "代码注释准确反映了新的职责分离架构",
+      "必要性": "Important",
+      "评估维度": "风格（style）",
+      "验证方式": "静态-人工验证",
+      "显性(Explicit)隐性（Implicit）": "Implicit",
+      "rationale": "文档应与代码架构保持一致，通过注释审查可以验证文档的准确性。"
+    },
+    {
+      "rubric_id": "R10",
+      "rubric_content": "所有顶点相关的类型定义和接口都放在单独的文件中",
+      "必要性": "Optional",
+      "评估维度": "风格（style）",
+      "验证方式": "静态-模型验证",
+      "显性(Explicit)隐性（Implicit）": "Implicit",
+      "rationale": "良好的代码组织可以提高可维护性，通过文件结构可以验证代码组织是否合理。"
+    },
+    {
+      "rubric_id": "R11",
+      "rubric_content": "重构后的代码消除了顶点逻辑和图逻辑的耦合问题",
+      "必要性": "Important",
+      "评估维度": "鲁棒性（robustness）",
+      "验证方式": "静态-人工验证",
+      "显性(Explicit)隐性（Implicit）": "Implicit",
+      "rationale": "消除耦合是重构的核心目标，通过代码分析可以验证是否解决了原有问题。"
+    },
+    {
+      "rubric_id": "R12",
+      "rubric_content": "新增顶点功能时只需修改 vertex 结构体，不会影响 DAG 结构体",
+      "必要性": "Important",
+      "评估维度": "鲁棒性（robustness）",
+      "验证方式": "静态-人工验证",
+      "显性(Explicit)隐性（Implicit）": "Implicit",
+      "rationale": "提高扩展性是重构的重要目标，通过架构分析可以验证是否实现了更好的可扩展性。"
+    }
+  ]

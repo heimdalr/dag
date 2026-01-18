@@ -1,0 +1,182 @@
+[
+  {
+    "rubric_id": "R01",
+    "rubric_content": "代码中必须定义一个名为 Vertex 的接口类型（type Vertex interface）",
+    "必要性": "Essential",
+    "评估维度": "功能要求（functional requirement）",
+    "验证方式": "静态-模型验证",
+    "显性(Explicit)隐性（Implicit）": "Explicit",
+    "rationale": "题目明确要求'定义个Vertex接口，把顶点的行为逻辑抽象到这个里面'，这是核心显性要求，通过静态代码分析可以检查接口定义是否存在。"
+  },
+  {
+    "rubric_id": "R02",
+    "rubric_content": "必须定义一个具体的 vertex 结构体（type vertex struct 或类似命名如 vertexImpl）来实现 Vertex 接口",
+    "必要性": "Essential",
+    "评估维度": "功能要求（functional requirement）",
+    "验证方式": "静态-模型验证",
+    "显性(Explicit)隐性（Implicit）": "Explicit",
+    "rationale": "题目明确要求'创建具体的vertex结构体实现这个接口'，这是核心显性要求，通过静态代码分析可以检查结构体定义是否存在。"
+  },
+  {
+    "rubric_id": "R03",
+    "rubric_content": "DAG 结构体中不应再直接包含顶点的具体数据存储字段（如 vertices map[interface{}]string），应改为通过 Vertex 接口或独立的顶点管理组件来管理",
+    "必要性": "Essential",
+    "评估维度": "功能要求（functional requirement）",
+    "验证方式": "静态-模型验证",
+    "显性(Explicit)隐性（Implicit）": "Explicit",
+    "rationale": "题目要求'重构DAG结构体，把顶点相关的字段和方法分离出来'，通过静态分析 DAG 结构体的字段定义可以验证顶点字段是否已被分离。"
+  },
+  {
+    "rubric_id": "R04",
+    "rubric_content": "NewDAG() 函数的签名必须保持为 func NewDAG() *DAG，返回类型不变",
+    "必要性": "Essential",
+    "评估维度": "功能要求（functional requirement）",
+    "验证方式": "静态-模型验证",
+    "显性(Explicit)隐性（Implicit）": "Explicit",
+    "rationale": "题目明确要求'保证外部API完全不变'，NewDAG 是核心工厂函数，通过静态代码分析可以检查函数签名是否保持一致。"
+  },
+  {
+    "rubric_id": "R05",
+    "rubric_content": "AddVertex 方法的签名必须保持为 func (d *DAG) AddVertex(v interface{}) (string, error)",
+    "必要性": "Essential",
+    "评估维度": "功能要求（functional requirement）",
+    "验证方式": "静态-模型验证",
+    "显性(Explicit)隐性（Implicit）": "Explicit",
+    "rationale": "题目明确要求'保证外部API完全不变'，AddVertex 是核心外部 API，通过静态代码分析可以检查方法签名是否保持一致。"
+  },
+  {
+    "rubric_id": "R06",
+    "rubric_content": "GetVertex 方法的签名必须保持为 func (d *DAG) GetVertex(id string) (interface{}, error)",
+    "必要性": "Essential",
+    "评估维度": "功能要求（functional requirement）",
+    "验证方式": "静态-模型验证",
+    "显性(Explicit)隐性（Implicit）": "Explicit",
+    "rationale": "题目明确要求'保证外部API完全不变'，GetVertex 是核心外部 API，通过静态代码分析可以检查方法签名是否保持一致。"
+  },
+  {
+    "rubric_id": "R07",
+    "rubric_content": "DeleteVertex 方法的签名必须保持为 func (d *DAG) DeleteVertex(id string) error",
+    "必要性": "Essential",
+    "评估维度": "功能要求（functional requirement）",
+    "验证方式": "静态-模型验证",
+    "显性(Explicit)隐性（Implicit）": "Explicit",
+    "rationale": "题目明确要求'保证外部API完全不变'，DeleteVertex 是核心外部 API，通过静态代码分析可以检查方法签名是否保持一致。"
+  },
+  {
+    "rubric_id": "R08",
+    "rubric_content": "AddEdge 方法的签名必须保持为 func (d *DAG) AddEdge(srcID, dstID string) error",
+    "必要性": "Essential",
+    "评估维度": "功能要求（functional requirement）",
+    "验证方式": "静态-模型验证",
+    "显性(Explicit)隐性（Implicit）": "Explicit",
+    "rationale": "题目明确要求'保证外部API完全不变'，AddEdge 是核心外部 API，通过静态代码分析可以检查方法签名是否保持一致。"
+  },
+  {
+    "rubric_id": "R09",
+    "rubric_content": "Vertex 接口中必须包含获取顶点 ID 的方法（如 ID() string 或 GetID() string）",
+    "必要性": "Important",
+    "评估维度": "功能要求（functional requirement）",
+    "验证方式": "静态-模型验证",
+    "显性(Explicit)隐性（Implicit）": "Implicit",
+    "rationale": "虽然题目没有明确指定接口方法，但根据原代码中顶点需要 ID 进行标识的逻辑，Vertex 接口应包含 ID 相关方法，这是符合业务逻辑的隐性需求。"
+  },
+  {
+    "rubric_id": "R10",
+    "rubric_content": "代码必须保持使用 Go 语言编写，包名必须仍为 dag（package dag）",
+    "必要性": "Essential",
+    "评估维度": "功能要求（functional requirement）",
+    "验证方式": "静态-模型验证",
+    "显性(Explicit)隐性（Implicit）": "Implicit",
+    "rationale": "原仓库使用 Go 语言，重构必须保持语言一致性，通过静态代码分析可以检查包声明。"
+  },
+  {
+    "rubric_id": "R11",
+    "rubric_content": "原有的错误类型（VertexNilError, VertexDuplicateError, IDDuplicateError, IDEmptyError, IDUnknownError, EdgeDuplicateError, EdgeUnknownError, EdgeLoopError, SrcDstEqualError）必须全部保留",
+    "必要性": "Essential",
+    "评估维度": "功能要求（functional requirement）",
+    "验证方式": "静态-模型验证",
+    "显性(Explicit)隐性（Implicit）": "Explicit",
+    "rationale": "题目要求'保证外部API完全不变'，这些错误类型是 API 的一部分，外部代码可能依赖这些错误类型进行错误处理，通过静态分析可检查这些类型定义是否存在。"
+  },
+  {
+    "rubric_id": "R12",
+    "rubric_content": "IDInterface 接口定义必须保留，签名为 type IDInterface interface { ID() string }",
+    "必要性": "Essential",
+    "评估维度": "功能要求（functional requirement）",
+    "验证方式": "静态-模型验证",
+    "显性(Explicit)隐性（Implicit）": "Explicit",
+    "rationale": "题目要求'保证外部API完全不变'，IDInterface 是现有外部 API 的一部分，用户可能实现此接口来自定义顶点 ID，通过静态分析可检查接口定义。"
+  },
+  {
+    "rubric_id": "R13",
+    "rubric_content": "GetParents、GetChildren、GetAncestors、GetDescendants 方法的签名必须保持不变，返回类型仍为 (map[string]interface{}, error)",
+    "必要性": "Essential",
+    "评估维度": "功能要求（functional requirement）",
+    "验证方式": "静态-模型验证",
+    "显性(Explicit)隐性（Implicit）": "Explicit",
+    "rationale": "题目要求'保证外部API完全不变'，这些是关键的图遍历 API，通过静态代码分析可以检查方法签名是否保持一致。"
+  },
+  {
+    "rubric_id": "R14",
+    "rubric_content": "vertex 结构体（或实现 Vertex 接口的具体类型）应该是非导出类型（小写字母开头），以保持封装性",
+    "必要性": "Important",
+    "评估维度": "风格（style）",
+    "验证方式": "静态-模型验证",
+    "显性(Explicit)隐性（Implicit）": "Implicit",
+    "rationale": "Go 语言最佳实践要求内部实现细节使用非导出类型，题目要求外部 API 不变意味着 vertex 具体实现应该是内部细节，通过静态分析可检查类型命名。"
+  },
+  {
+    "rubric_id": "R15",
+    "rubric_content": "FlowResult 结构体和 FlowCallback 类型定义必须保留不变",
+    "必要性": "Essential",
+    "评估维度": "功能要求（functional requirement）",
+    "验证方式": "静态-模型验证",
+    "显性(Explicit)隐性（Implicit）": "Explicit",
+    "rationale": "题目要求'保证外部API完全不变'，FlowResult 和 FlowCallback 是 DescendantsFlow 功能的公开类型，通过静态分析可检查类型定义是否保留。"
+  },
+  {
+    "rubric_id": "R16",
+    "rubric_content": "Vertex 接口应包含获取顶点存储值的方法（如 Value() interface{} 或 GetValue() interface{}），以支持用户获取顶点关联的业务数据",
+    "必要性": "Important",
+    "评估维度": "功能要求（functional requirement）",
+    "验证方式": "静态-模型验证",
+    "显性(Explicit)隐性（Implicit）": "Implicit",
+    "rationale": "原代码中 vertexIds map 存储了顶点值，重构后 Vertex 接口需要提供获取值的方法以保持功能完整，这是根据原有功能推导出的隐性需求。"
+  },
+  {
+    "rubric_id": "R17",
+    "rubric_content": "DAG 结构体应该通过组合（composition）方式引用顶点管理组件或存储 Vertex 接口的集合，而不是直接在 DAG 中定义顶点相关的 map 字段",
+    "必要性": "Important",
+    "评估维度": "功能要求（functional requirement）",
+    "验证方式": "静态-模型验证",
+    "显性(Explicit)隐性（Implicit）": "Implicit",
+    "rationale": "题目要求'让DAG只管图结构，顶点管自己的逻辑'，这暗示应使用组合模式将顶点管理职责委托给独立组件，通过静态分析 DAG 结构体定义可验证是否采用了组合方式。"
+  },
+  {
+    "rubric_id": "R18",
+    "rubric_content": "DescendantsFlow 方法的签名必须保持为 func (d *DAG) DescendantsFlow(startID string, inputs []FlowResult, callback FlowCallback) ([]FlowResult, error)",
+    "必要性": "Essential",
+    "评估维度": "功能要求（functional requirement）",
+    "验证方式": "静态-模型验证",
+    "显性(Explicit)隐性（Implicit）": "Explicit",
+    "rationale": "题目要求'保证外部API完全不变'，DescendantsFlow 是高级图遍历功能的核心 API，通过静态代码分析可检查方法签名是否保持一致。"
+  },
+  {
+    "rubric_id": "R19",
+    "rubric_content": "Options 结构体及其 VertexHashFunc 字段必须保留，DAG.Options(options Options) 方法签名必须保持不变",
+    "必要性": "Essential",
+    "评估维度": "功能要求（functional requirement）",
+    "验证方式": "静态-模型验证",
+    "显性(Explicit)隐性（Implicit）": "Explicit",
+    "rationale": "题目要求'保证外部API完全不变'，Options 是允许用户自定义顶点哈希函数的配置接口，通过静态分析可检查类型和方法定义是否保留。"
+  },
+  {
+    "rubric_id": "R20",
+    "rubric_content": "重构后的代码不应引入循环依赖，Vertex 接口和实现不应反向依赖 DAG 结构体（即 vertex 包/文件不应 import DAG 类型）",
+    "必要性": "Important",
+    "评估维度": "鲁棒性（robustness）",
+    "验证方式": "静态-模型验证",
+    "显性(Explicit)隐性（Implicit）": "Implicit",
+    "rationale": "良好的代码架构要求避免循环依赖，题目要求'把顶点和图的职责分开'意味着 vertex 应该是独立的不依赖 DAG 的组件，通过静态分析 import 语句和类型引用可验证是否存在循环依赖。"
+  }
+]

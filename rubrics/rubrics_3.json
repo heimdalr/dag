@@ -1,0 +1,182 @@
+[
+  {
+    "rubric_id": "R01",
+    "rubric_content": "代码中必须定义一个名为 Vertex 的接口类型（type Vertex interface）",
+    "必要性": "Essential",
+    "评估维度": "功能要求（functional requirement）",
+    "验证方式": "静态-模型验证",
+    "显性(Explicit)隐性（Implicit）": "Explicit",
+    "rationale": "题目明确要求定义 Vertex 接口来承载顶点行为逻辑，这是核心显性要求，静态代码分析可直接验证接口定义是否存在。"
+  },
+  {
+    "rubric_id": "R02",
+    "rubric_content": "Vertex 接口必须包含至少一个方法（非空接口），以体现“顶点行为逻辑”的抽象",
+    "必要性": "Essential",
+    "评估维度": "功能要求（functional requirement）",
+    "验证方式": "静态-模型验证",
+    "显性(Explicit)隐性（Implicit）": "Implicit",
+    "rationale": "题目强调将顶点行为逻辑抽象到接口中，隐含要求接口具有具体方法而非空接口，可通过静态检查接口方法列表验证。"
+  },
+  {
+    "rubric_id": "R03",
+    "rubric_content": "必须定义具体的 vertex 结构体（如 type vertex struct 或等价命名）并实现 Vertex 接口的方法",
+    "必要性": "Essential",
+    "评估维度": "功能要求（functional requirement）",
+    "验证方式": "静态-模型验证",
+    "显性(Explicit)隐性（Implicit）": "Explicit",
+    "rationale": "题目明确要求创建具体 vertex 结构体实现接口，可通过结构体定义与方法集匹配进行静态验证。"
+  },
+  {
+    "rubric_id": "R04",
+    "rubric_content": "DAG 结构体中不应再直接包含顶点存储相关字段（如 vertices、vertexIds、verticesLocked 等）",
+    "必要性": "Essential",
+    "评估维度": "功能要求（functional requirement）",
+    "验证方式": "静态-模型验证",
+    "显性(Explicit)隐性（Implicit）": "Explicit",
+    "rationale": "题目要求将顶点相关字段从 DAG 中分离出去，静态查看 DAG 字段可验证是否已移除。"
+  },
+  {
+    "rubric_id": "R05",
+    "rubric_content": "必须新增一个独立的顶点管理组件（如 vertexStore/vertexManager 等结构体）来集中管理顶点数据与其互斥锁",
+    "必要性": "Important",
+    "评估维度": "功能要求（functional requirement）",
+    "验证方式": "静态-人工验证",
+    "显性(Explicit)隐性（Implicit）": "Implicit",
+    "rationale": "题目要求将顶点职责独立出来，隐含需要一个独立的顶点管理实体来承载数据与并发控制，可通过代码结构人工静态审查验证。"
+  },
+  {
+    "rubric_id": "R06",
+    "rubric_content": "AddVertex 方法的签名必须保持为 func (d *DAG) AddVertex(v interface{}) (string, error)",
+    "必要性": "Essential",
+    "评估维度": "功能要求（functional requirement）",
+    "验证方式": "静态-模型验证",
+    "显性(Explicit)隐性（Implicit）": "Explicit",
+    "rationale": "题目要求外部 API 完全不变，AddVertex 是核心公共方法，静态检查函数签名即可验证。"
+  },
+  {
+    "rubric_id": "R07",
+    "rubric_content": "AddVertexByID 方法的签名必须保持为 func (d *DAG) AddVertexByID(id string, v interface{}) error",
+    "必要性": "Essential",
+    "评估维度": "功能要求（functional requirement）",
+    "验证方式": "静态-模型验证",
+    "显性(Explicit)隐性（Implicit）": "Explicit",
+    "rationale": "题目要求外部 API 完全不变，AddVertexByID 是公共入口，静态检查签名即可验证。"
+  },
+  {
+    "rubric_id": "R08",
+    "rubric_content": "GetVertex 方法的签名必须保持为 func (d *DAG) GetVertex(id string) (interface{}, error)",
+    "必要性": "Essential",
+    "评估维度": "功能要求（functional requirement）",
+    "验证方式": "静态-模型验证",
+    "显性(Explicit)隐性（Implicit）": "Explicit",
+    "rationale": "题目要求外部 API 完全不变，GetVertex 是公共查询方法，静态检查签名即可验证。"
+  },
+  {
+    "rubric_id": "R09",
+    "rubric_content": "DeleteVertex 方法的签名必须保持为 func (d *DAG) DeleteVertex(id string) error",
+    "必要性": "Essential",
+    "评估维度": "功能要求（functional requirement）",
+    "验证方式": "静态-模型验证",
+    "显性(Explicit)隐性（Implicit）": "Explicit",
+    "rationale": "题目要求外部 API 完全不变，DeleteVertex 是公共删除方法，静态检查签名即可验证。"
+  },
+  {
+    "rubric_id": "R10",
+    "rubric_content": "AddEdge 方法的签名必须保持为 func (d *DAG) AddEdge(srcID, dstID string) error",
+    "必要性": "Essential",
+    "评估维度": "功能要求（functional requirement）",
+    "验证方式": "静态-模型验证",
+    "显性(Explicit)隐性（Implicit）": "Explicit",
+    "rationale": "题目要求外部 API 完全不变，AddEdge 是图结构核心公共方法，静态检查签名即可验证。"
+  },
+  {
+    "rubric_id": "R11",
+    "rubric_content": "GetVertices 方法的签名必须保持为 func (d *DAG) GetVertices() map[string]interface{}",
+    "必要性": "Essential",
+    "评估维度": "功能要求（functional requirement）",
+    "验证方式": "静态-模型验证",
+    "显性(Explicit)隐性（Implicit）": "Explicit",
+    "rationale": "题目要求外部 API 完全不变，GetVertices 是公共查询方法，静态检查签名即可验证。"
+  },
+  {
+    "rubric_id": "R12",
+    "rubric_content": "NewDAG 函数的签名必须保持为 func NewDAG() *DAG",
+    "必要性": "Essential",
+    "评估维度": "功能要求（functional requirement）",
+    "验证方式": "静态-模型验证",
+    "显性(Explicit)隐性（Implicit）": "Explicit",
+    "rationale": "题目要求外部 API 完全不变，NewDAG 是核心工厂函数，静态检查签名即可验证。"
+  },
+  {
+    "rubric_id": "R13",
+    "rubric_content": "Options 结构体及 func (d *DAG) Options(options Options) 的签名必须保持不变",
+    "必要性": "Important",
+    "评估维度": "功能要求（functional requirement）",
+    "验证方式": "静态-模型验证",
+    "显性(Explicit)隐性（Implicit）": "Explicit",
+    "rationale": "题目要求外部 API 不变，Options 属于公共配置入口，静态检查类型与方法签名即可验证。"
+  },
+  {
+    "rubric_id": "R14",
+    "rubric_content": "IDInterface 接口必须保留且签名为 ID() string",
+    "必要性": "Important",
+    "评估维度": "功能要求（functional requirement）",
+    "验证方式": "静态-模型验证",
+    "显性(Explicit)隐性（Implicit）": "Implicit",
+    "rationale": "外部 API 完全不变隐含保持 IDInterface 以兼容自定义 ID 逻辑，静态检查接口定义即可验证。"
+  },
+  {
+    "rubric_id": "R15",
+    "rubric_content": "顶点哈希仍需通过 Options.VertexHashFunc 计算（不应硬编码其他哈希策略）",
+    "必要性": "Important",
+    "评估维度": "功能要求（functional requirement）",
+    "验证方式": "静态-模型验证",
+    "显性(Explicit)隐性（Implicit）": "Implicit",
+    "rationale": "保持外部 API 行为与可配置性不变是隐含要求，静态检查顶点哈希逻辑是否调用 Options.VertexHashFunc 可验证。"
+  },
+  {
+    "rubric_id": "R16",
+    "rubric_content": "原有导出的错误类型（如 VertexNilError、VertexDuplicateError、IDDuplicateError）名称必须保留不变",
+    "必要性": "Important",
+    "评估维度": "功能要求（functional requirement）",
+    "验证方式": "静态-模型验证",
+    "显性(Explicit)隐性（Implicit）": "Implicit",
+    "rationale": "外部 API 完全不变隐含错误类型名称与可引用性保持一致，静态检查类型定义名称即可验证。"
+  },
+  {
+    "rubric_id": "R17",
+    "rubric_content": "GetParents 方法的签名必须保持为 func (d *DAG) GetParents(id string) (map[string]interface{}, error)",
+    "必要性": "Important",
+    "评估维度": "功能要求（functional requirement）",
+    "验证方式": "静态-模型验证",
+    "显性(Explicit)隐性（Implicit）": "Explicit",
+    "rationale": "题目要求外部 API 完全不变，GetParents 是公共查询方法，静态检查签名即可验证。"
+  },
+  {
+    "rubric_id": "R18",
+    "rubric_content": "GetChildren 方法的签名必须保持为 func (d *DAG) GetChildren(id string) (map[string]interface{}, error)",
+    "必要性": "Important",
+    "评估维度": "功能要求（functional requirement）",
+    "验证方式": "静态-模型验证",
+    "显性(Explicit)隐性（Implicit）": "Explicit",
+    "rationale": "题目要求外部 API 完全不变，GetChildren 是公共查询方法，静态检查签名即可验证。"
+  },
+  {
+    "rubric_id": "R19",
+    "rubric_content": "GetAncestors 方法的签名必须保持为 func (d *DAG) GetAncestors(id string) (map[string]interface{}, error)",
+    "必要性": "Important",
+    "评估维度": "功能要求（functional requirement）",
+    "验证方式": "静态-模型验证",
+    "显性(Explicit)隐性（Implicit）": "Explicit",
+    "rationale": "题目要求外部 API 完全不变，GetAncestors 是公共查询方法，静态检查签名即可验证。"
+  },
+  {
+    "rubric_id": "R20",
+    "rubric_content": "GetDescendants 方法的签名必须保持为 func (d *DAG) GetDescendants(id string) (map[string]interface{}, error)",
+    "必要性": "Important",
+    "评估维度": "功能要求（functional requirement）",
+    "验证方式": "静态-模型验证",
+    "显性(Explicit)隐性（Implicit）": "Explicit",
+    "rationale": "题目要求外部 API 完全不变，GetDescendants 是公共查询方法，静态检查签名即可验证。"
+  }
+]
