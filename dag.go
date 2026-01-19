@@ -1013,9 +1013,12 @@ func (d *DAG) ReduceTransitively() {
 	graphChanged := false
 
 	// populate the descendents cache for all roots (i.e. the whole graph)
-	for _, root := range d.getRoots() {
-		_ = d.getDescendants(root)
-	}
+	d.vertexStore.eachByHash(func(vHash interface{}, _ string, _ interface{}) {
+		srcIDs, ok := d.inboundEdge[vHash]
+		if !ok || len(srcIDs) == 0 {
+			_ = d.getDescendants(vHash)
+		}
+	})
 
 	// for each vertex
 	d.vertexStore.eachByHash(func(vHash interface{}, _ string, _ interface{}) {
