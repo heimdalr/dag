@@ -601,7 +601,6 @@ func (d *DAG) AncestorsWalker(id string) (chan string, chan bool, error) {
 		d.walkAncestors(vHash, ids, signal)
 		d.muDAG.RUnlock()
 		close(ids)
-		close(signal)
 	}()
 	return ids, signal, nil
 }
@@ -855,7 +854,6 @@ func (d *DAG) DescendantsWalker(id string) (chan string, chan bool, error) {
 		d.walkDescendants(vHash, ids, signal)
 		d.muDAG.RUnlock()
 		close(ids)
-		close(signal)
 	}()
 	return ids, signal, nil
 }
